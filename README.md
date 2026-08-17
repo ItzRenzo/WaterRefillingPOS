@@ -1,4 +1,19 @@
-# Water Refilling POS
+# Water Refilling POS System
+
+## Project Description
+
+A point-of-sale system for managing water-refilling inventory through web, API, and mobile applications.
+
+## Group Members
+
+- Walton Alfante
+- Clark Balbuena
+- Ed Lorenz Bersamin
+- Zenrick Denver Mintal
+
+## Course
+
+**CCE 106L – Applications Development and Emerging Technologies**
 
 This workspace contains three independent applications:
 
