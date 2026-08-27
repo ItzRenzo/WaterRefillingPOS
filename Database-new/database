@@ -1,0 +1,185 @@
+CREATE DATABASE IF NOT EXISTS waterproject;
+USE waterproject;
+
+-- 1. Customers
+CREATE TABLE Customer (
+    CustomerID INT PRIMARY KEY AUTO_INCREMENT,
+    CustomerName VARCHAR(100) NOT NULL,
+    CustomerNumber VARCHAR(12) NOT NULL,
+    CustomerAddress VARCHAR(255) NOT NULL
+);
+
+-- 2. Containers 
+CREATE TABLE Container (
+    ContainerID INT PRIMARY KEY AUTO_INCREMENT,
+    ContainerType VARCHAR(50) NOT NULL,
+    `ContainerCapacity(L)` DECIMAL(10,2) NOT NULL,
+    ContainerStatus VARCHAR(50) NOT NULL,
+    Stocks INT NOT NULL DEFAULT 0
+);
+
+-- 3. Products
+CREATE TABLE Product (
+    ProductID INT PRIMARY KEY AUTO_INCREMENT,
+    ProductName VARCHAR(100) NOT NULL,
+    ProductPrice DECIMAL(10,2) NOT NULL,
+    ProductDescription TEXT,
+    ProductStatus VARCHAR(50) NOT NULL,
+    Stocks INT NOT NULL DEFAULT 0,
+    ProductUnit VARCHAR(50) NULL,
+    MinStock INT NOT NULL DEFAULT 10,
+    UpdatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    ContainerID INT,
+    FOREIGN KEY (ContainerID) 
+        REFERENCES Container(ContainerID)
+);
+
+-- 4. Employees
+CREATE TABLE Employee (
+    EmployeeID INT PRIMARY KEY AUTO_INCREMENT,
+    FirstName VARCHAR(50) NOT NULL,
+    LastName VARCHAR(50) NOT NULL,
+    EmployeePosition VARCHAR(50) NOT NULL,
+    EmployeeNumber VARCHAR(12) NOT NULL,
+    EmployeeStatus VARCHAR(50) NOT NULL,
+    Username VARCHAR(50) NOT NULL,
+    Password VARCHAR(255) NOT NULL,
+    DateJoined DATE NULL
+);
+
+-- 5. Transactions
+CREATE TABLE Transaction (
+    TransactionID INT PRIMARY KEY AUTO_INCREMENT,
+    CustomerID INT,
+    ProductID   INT,
+    Price DECIMAL(10,2) NOT NULL,
+    Quantity INT NOT NULL,
+    PaymentMethod VARCHAR(50),
+    DeliveryStatus VARCHAR(50),
+    DeliveryMethod VARCHAR(50),
+    TransactionDate DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (CustomerID) 
+        REFERENCES Customer(CustomerID),
+    FOREIGN KEY (ProductID)
+        REFERENCES Product(ProductID)
+);
+
+-- 6. Expense types
+CREATE TABLE ExpenseTypes (
+    ExpenseTypeID INT PRIMARY KEY AUTO_INCREMENT,
+    TypeName VARCHAR(100) NOT NULL,
+    Category VARCHAR(100)
+);
+
+-- 7. Logged expenses
+CREATE TABLE LoggedExpenses (
+    ExpensesID INT PRIMARY KEY AUTO_INCREMENT,
+    ExpenseTypeID INT,
+    Amount DECIMAL(10,2) NOT NULL,
+    ExpenseDate DATE NOT NULL,
+    Description TEXT,
+    FOREIGN KEY (ExpenseTypeID) 
+        REFERENCES ExpenseTypes(ExpenseTypeID)
+);
+
+-- 8. Reports 
+CREATE TABLE StockReports (
+    StockReportID INT PRIMARY KEY AUTO_INCREMENT,
+    ContainerID INT,
+    Stocks_Added INT NOT NULL DEFAULT 0,
+    Stocks_Added_Date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ContainerID) 
+        REFERENCES Container(ContainerID)
+);
+
+CREATE TABLE IF NOT EXISTS WaterTankLog (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    tank_level DECIMAL(10,2) NOT NULL,
+    last_refill DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Initialize with a full tank if empty
+INSERT INTO WaterTankLog (tank_level, last_refill)
+SELECT 500, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM WaterTankLog);
+
+-- Inserts
+-- Populate Containers
+INSERT INTO Container (ContainerID, ContainerType, `ContainerCapacity(L)`, ContainerStatus, Stocks) VALUES
+  (1, '5 Gallon', 20.00, 'Available', 20),
+  (2, 'Plastic',  0.50, 'Available', 50);
+
+-- Populate Products
+INSERT INTO Product (ProductID, ProductName,          ProductPrice, ProductDescription,               ProductStatus, Stocks, ContainerID) VALUES
+  (1, 'Mineral Water',           35.00, 'Natural minerals and electrolytes', 'Available',  7, 1),
+  (2, 'Purified Water',          25.00, 'Clean and pure drinking water',       'Available',  9, 1),
+  (3, 'Alkaline Water',          45.00, 'Higher pH for balanced health',       'Available', 20, 1),
+  (4, 'Distilled Water',         30.00, 'Pure H2O with no minerals',           'Available', 19, 1),
+  (5, 'Mineral Water Bottle',    15.00, 'Natural minerals and electrolytes', 'Available', 48, 2),
+  (6, 'Purified Water Bottle',   12.00, 'Clean and pure drinking water',       'Available', 50, 2),
+  (7, 'Alkaline Water Bottle',   18.00, 'Higher pH for balanced health',       'Available', 49, 2),
+  (8, 'Distilled Water Bottle',  14.00, 'Pure H2O with no minerals',           'Available', 50, 2);
+
+  INSERT INTO ExpenseTypes (TypeName, Category)
+VALUES 
+    ('Water Bill', 'utilities'),
+    ('Container Purchase', 'supplies'),
+    ('Filter Replacement & Machine Maintenance', 'maintenance'),
+    ('Staff Salary', 'salaries'),
+    ('Store Rental', 'rent'),
+    ('Delivery Fuel Cost', 'transportation'),
+    ('Business Permit Renewal', 'other');
+
+INSERT INTO LoggedExpenses (ExpenseTypeID, Amount, ExpenseDate, Description)
+VALUES
+(1, 1200.00, '2025-05-01', 'Monthly water utility payment'),
+(2, 3000.00, '2025-05-02', 'Purchased 100 new containers'),
+(3, 850.00, '2025-05-03', 'Replaced machine filters'),
+(4, 7000.00, '2025-05-05', 'Staff salary for April'),
+(5, 5000.00, '2025-05-06', 'Monthly rent payment'),
+(6, 1500.00, '2025-05-06', 'Fuel for delivery truck'),
+(7, 1200.00, '2025-05-07', 'Barangay business permit renewal'),
+(2, 2800.00, '2025-05-08', 'New batch of containers'),
+(3, 600.00, '2025-05-09', 'Routine equipment cleaning'),
+(1, 1250.00, '2025-05-10', 'Water bill for May'),
+(4, 6800.00, '2025-04-30', 'Staff salary for March'),
+(5, 5000.00, '2025-04-28', 'Rent payment'),
+(6, 1400.00, '2025-04-27', 'Gas refill for delivery'),
+(1, 1150.00, '2025-04-15', 'Water bill'),
+(2, 2600.00, '2025-04-14', 'Containers restocked'),
+(3, 950.00, '2025-04-13', 'System maintenance'),
+(7, 500.00, '2025-04-12', 'Fire safety certificate fee'),
+(2, 2500.00, '2025-04-11', 'Containers purchased'),
+(3, 1000.00, '2025-04-10', 'Filter replacement'),
+(4, 7100.00, '2025-04-09', 'Salary payout'),
+(6, 1600.00, '2025-04-08', 'Fuel expense'),
+(1, 1300.00, '2025-03-31', 'Water bill March'),
+(5, 5000.00, '2025-03-30', 'Rental fee'),
+(2, 2400.00, '2025-03-29', 'Plastic containers'),
+(3, 875.00, '2025-03-28', 'Machine checkup'),
+(7, 700.00, '2025-03-27', 'Sanitary permit renewal'),
+(4, 6950.00, '2025-03-26', 'Wages for March'),
+(6, 1550.00, '2025-03-25', 'Diesel for delivery bike'),
+(1, 1225.00, '2025-03-24', 'Utility bill'),
+(2, 2700.00, '2025-03-23', 'Containers inventory'),
+(3, 1100.00, '2025-03-22', 'UV machine servicing'),
+(4, 6900.00, '2025-03-21', 'Staff payment'),
+(5, 5000.00, '2025-03-20', 'Store rent'),
+(6, 1420.00, '2025-03-19', 'Delivery fuel refill'),
+(7, 800.00, '2025-03-18', 'Miscellaneous documents'),
+(2, 2950.00, '2025-03-17', 'Container restock'),
+(3, 700.00, '2025-03-16', 'Routine check'),
+(1, 1200.00, '2025-03-15', 'Water bill'),
+(4, 7200.00, '2025-03-14', 'Full staff salary'),
+(5, 5000.00, '2025-03-13', 'Monthly rent'),
+(6, 1450.00, '2025-03-12', 'Delivery fuel'),
+(7, 600.00, '2025-03-11', 'Barangay fees'),
+(1, 1250.00, '2025-03-10', 'Utility water charge'),
+(2, 3100.00, '2025-03-09', 'New bottles'),
+(3, 950.00, '2025-03-08', 'Machine service'),
+(4, 7050.00, '2025-03-07', 'Salaries'),
+(6, 1580.00, '2025-03-06', 'Gasoline for deliveries'),
+(7, 950.00, '2025-03-05', 'Government registration fee'),
+(1, 1180.00, '2025-03-04', 'Water bill'),
+(2, 2550.00, '2025-03-03', 'Container purchase'),
+(3, 880.00, '2025-03-02', 'Filter clean-up');
