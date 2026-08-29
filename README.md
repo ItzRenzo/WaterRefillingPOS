@@ -72,6 +72,9 @@ npm start
 The API health endpoints are `http://localhost:8000/up` and
 `http://localhost:8000/api/health`.
 
+The Products REST API is available at `http://localhost:8000/api/products`.
+See [SUBMISSION.md](SUBMISSION.md) for its endpoint list, test evidence, and screenshots.
+
 For a physical phone, replace `localhost` in `mobile/.env.local` with the
 computer's LAN IP address and run Laravel on the network:
 
