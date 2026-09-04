@@ -19,6 +19,7 @@ class ProductController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $this->ensureAdmin($request);
         $product = Product::query()->create($this->validatedData($request));
 
         return response()->json([
@@ -34,6 +35,7 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product): JsonResponse
     {
+        $this->ensureAdmin($request);
         $product->update($this->validatedData($request, true));
 
         return response()->json([
@@ -42,8 +44,9 @@ class ProductController extends Controller
         ]);
     }
 
-    public function destroy(Product $product): JsonResponse
+    public function destroy(Request $request, Product $product): JsonResponse
     {
+        $this->ensureAdmin($request);
         $deletedProduct = $product->only(['id', 'name']);
         $product->delete();
 
@@ -66,5 +69,10 @@ class ProductController extends Controller
             'unit' => [$required, 'string', 'max:50'],
             'min_stock' => [$required, 'integer', 'min:0'],
         ]);
+    }
+
+    private function ensureAdmin(Request $request): void
+    {
+        abort_unless($request->user()->hasRole('admin'), 403, 'Only administrators can manage inventory.');
     }
 }

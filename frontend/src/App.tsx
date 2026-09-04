@@ -1,30 +1,40 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api, getApiToken, setApiToken } from "./api";
 
 /* ── Types ───────────────────────────────────────────────────────────── */
 type Role = "admin" | "cashier";
-interface User         { name: string; role: Role; }
+interface User         { id: number; name: string; username: string; role: Role; }
 interface InventoryItem { id: number; name: string; unit: string; quantity: number; minStock: number; pricePerUnit: number; lastUpdated: string; }
 interface Transaction   { id: number; qty: number; total: number; cashier: string; time: string; }
+interface ApiProduct { id: number; name: string; unit: string; stock: number; min_stock: number; price: number; updated_at: string; }
+interface ApiSale { id: number; quantity: number; total: number; cashier_name: string; created_at: string; }
 
 /* ── Constants ───────────────────────────────────────────────────────── */
 const BLUE   = "#1e40af";
 const BLUE_L = "#eff6ff";
 const BLUE_B = "#bfdbfe";
 
-const USERS = {
-  admin:   { username: "admin",   password: "admin123",   name: "Maria Santos",   role: "admin"   as Role },
-  cashier: { username: "cashier", password: "cashier123", name: "Rico Dela Cruz", role: "cashier" as Role },
-};
+function inventoryFromApi(product: ApiProduct): InventoryItem {
+  return {
+    id: product.id,
+    name: product.name,
+    unit: product.unit,
+    quantity: product.stock,
+    minStock: product.min_stock,
+    pricePerUnit: Number(product.price),
+    lastUpdated: product.updated_at.slice(0, 10),
+  };
+}
 
-const INITIAL_INVENTORY: InventoryItem[] = [
-  { id: 1, name: "1-Gallon Purified Water", unit: "gallon", quantity: 100, minStock: 20, pricePerUnit: 30, lastUpdated: "2026-08-25" },
-];
-
-const INITIAL_TRANSACTIONS: Transaction[] = [
-  { id: 1, qty: 3, total: 90,  cashier: "Rico Dela Cruz", time: "08:14 AM" },
-  { id: 2, qty: 1, total: 30,  cashier: "Rico Dela Cruz", time: "09:02 AM" },
-  { id: 3, qty: 5, total: 150, cashier: "Rico Dela Cruz", time: "10:30 AM" },
-];
+function transactionFromApi(sale: ApiSale): Transaction {
+  return {
+    id: sale.id,
+    qty: sale.quantity,
+    total: Number(sale.total),
+    cashier: sale.cashier_name,
+    time: new Date(sale.created_at).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" }),
+  };
+}
 
 /* ── Small helpers ───────────────────────────────────────────────────── */
 function stockVariant(qty: number, min: number): "ok" | "low" | "critical" {
@@ -340,25 +350,26 @@ function StatCard({ label, value, sub, accent }: { label: string; value: string;
 
 /* ── Login ───────────────────────────────────────────────────────────── */
 function LoginPage({ onLogin }: { onLogin: (u: User) => void }) {
-  const [role, setRole]         = useState<Role>("cashier");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw]     = useState(false);
   const [error, setError]       = useState("");
   const [busy, setBusy]         = useState(false);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(""); setBusy(true);
-    setTimeout(() => {
-      const u = USERS[role];
-      if (username === u.username && password === u.password) {
-        onLogin({ name: u.name, role: u.role });
-      } else {
-        setError("Incorrect username or password.");
-        setBusy(false);
-      }
-    }, 400);
+    try {
+      const result = await api<{ token: string; user: User }>("/login", {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      });
+      setApiToken(result.token);
+      onLogin(result.user);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to sign in.");
+      setBusy(false);
+    }
   }
 
   return (
@@ -444,27 +455,7 @@ function LoginPage({ onLogin }: { onLogin: (u: User) => void }) {
 
           {/* Form body */}
           <div style={{ padding: "22px 28px 26px" }}>
-            <p style={{ margin: "0 0 14px", fontSize: 13, fontWeight: 600, color: "#374151" }}>Sign in as</p>
-
-            {/* Role cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 18 }}>
-              {([
-                { r: "cashier" as Role, icon: "👤", label: "Cashier", sub: "Process sales" },
-                { r: "admin"   as Role, icon: "🔧", label: "Admin",   sub: "Full control"  },
-              ]).map(({ r, icon, label, sub }) => (
-                <button key={r} onClick={() => { setRole(r); setError(""); setUsername(""); setPassword(""); }}
-                  style={{
-                    padding: "11px 8px 10px", borderRadius: 11, cursor: "pointer", textAlign: "center",
-                    border: `2px solid ${role === r ? BLUE : "#e5e7eb"}`,
-                    background: role === r ? BLUE_L : "#fafafa",
-                    transition: "all 0.15s", outline: "none",
-                  }}>
-                  <div style={{ fontSize: 20, lineHeight: 1, marginBottom: 4 }}>{icon}</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: role === r ? BLUE : "#374151", marginBottom: 1 }}>{label}</div>
-                  <div style={{ fontSize: 11, color: role === r ? "#3b82f6" : "#9ca3af" }}>{sub}</div>
-                </button>
-              ))}
-            </div>
+            <p style={{ margin: "0 0 18px", fontSize: 13, fontWeight: 600, color: "#374151" }}>Sign in to your account</p>
 
             <form onSubmit={submit}>
               <div style={{ marginBottom: 11 }}>
@@ -474,7 +465,7 @@ function LoginPage({ onLogin }: { onLogin: (u: User) => void }) {
                     style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
                     <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
                   </svg>
-                  <input type="text" value={username} placeholder={`${role} username`}
+                  <input type="text" value={username} placeholder="Enter your username"
                     onChange={e => setUsername(e.target.value)} autoComplete="username"
                     style={{ width: "100%", padding: "11px 13px 11px 36px", borderRadius: 10, fontSize: 14, color: "#111827", background: "#f8fafc", outline: "none", border: "1.5px solid #e2e8f0", transition: "all 0.15s", boxSizing: "border-box" }}
                     onFocus={e => { e.target.style.borderColor = BLUE; e.target.style.background = "#fff"; e.target.style.boxShadow = `0 0 0 3px ${BLUE_L}`; }}
@@ -583,8 +574,8 @@ function Paginator({ page, total, onChange }: { page: number; total: number; onC
 
 /* ── Dashboard ───────────────────────────────────────────────────────── */
 function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
-  const [inventory, setInventory]       = useState<InventoryItem[]>(INITIAL_INVENTORY);
-  const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
+  const [inventory, setInventory]       = useState<InventoryItem[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [search, setSearch]             = useState("");
   const [modal, setModal]               = useState<{ item: InventoryItem | null; isNew: boolean } | null>(null);
   const [deleteId, setDeleteId]         = useState<number | null>(null);
@@ -593,6 +584,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [tab, setTab]                   = useState<"inventory" | "transactions">("inventory");
   const [invPage, setInvPage]           = useState(1);
   const [txPage, setTxPage]             = useState(1);
+  const [loading, setLoading]           = useState(true);
 
   const item = inventory[0];
   const filtered = inventory.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
@@ -602,25 +594,68 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
   function handleSearch(v: string) { setSearch(v); setInvPage(1); }
 
-  function saveItem(i: InventoryItem) {
-    setInventory(prev => {
-      const idx = prev.findIndex(x => x.id === i.id);
-      if (idx >= 0) { const n = [...prev]; n[idx] = i; return n; }
-      return [...prev, i];
-    });
-    setModal(null);
-    showToast(i.name + " saved.");
+  useEffect(() => {
+    Promise.all([
+      api<{ data: ApiProduct[] }>("/products"),
+      api<{ data: ApiSale[] }>("/sales"),
+    ]).then(([products, sales]) => {
+      setInventory(products.data.map(inventoryFromApi));
+      setTransactions(sales.data.map(transactionFromApi));
+    }).catch(error => {
+      showToast(error instanceof Error ? error.message : "Unable to load dashboard data.");
+    }).finally(() => setLoading(false));
+  }, []);
+
+  async function saveItem(i: InventoryItem) {
+    try {
+      const isNew = modal?.isNew ?? false;
+      const result = await api<{ data: ApiProduct }>(isNew ? "/products" : `/products/${i.id}`, {
+        method: isNew ? "POST" : "PUT",
+        body: JSON.stringify({
+          name: i.name,
+          description: null,
+          price: i.pricePerUnit,
+          status: "available",
+          stock: i.quantity,
+          unit: i.unit,
+          min_stock: i.minStock,
+        }),
+      });
+      const saved = inventoryFromApi(result.data);
+      setInventory(prev => isNew ? [saved, ...prev] : prev.map(item => item.id === saved.id ? saved : item));
+      setModal(null);
+      showToast(saved.name + " saved.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to save product.");
+    }
   }
 
-  function processSale(qty: number) {
+  async function processSale(qty: number) {
     if (!saleItem) return;
-    const total = qty * saleItem.pricePerUnit;
-    const time  = new Date().toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit" });
-    setInventory(prev => prev.map(i => i.id === saleItem.id
-      ? { ...i, quantity: i.quantity - qty, lastUpdated: new Date().toISOString().split("T")[0] } : i));
-    setTransactions(prev => [{ id: Date.now(), qty, total, cashier: user.name, time }, ...prev]);
-    setSaleItem(null);
-    showToast(`Sold ${qty} gallon${qty > 1 ? "s" : ""} — ₱${total.toLocaleString()}`);
+    try {
+      const result = await api<{ data: ApiSale; product: ApiProduct }>("/sales", {
+        method: "POST",
+        body: JSON.stringify({ product_id: saleItem.id, quantity: qty }),
+      });
+      const updatedProduct = inventoryFromApi(result.product);
+      setInventory(prev => prev.map(item => item.id === updatedProduct.id ? updatedProduct : item));
+      setTransactions(prev => [transactionFromApi(result.data), ...prev]);
+      setSaleItem(null);
+      showToast(`Sold ${qty} ${saleItem.unit}${qty > 1 ? "s" : ""} — ₱${Number(result.data.total).toLocaleString()}`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to process sale.");
+    }
+  }
+
+  async function deleteProduct(id: number) {
+    try {
+      await api(`/products/${id}`, { method: "DELETE" });
+      setInventory(prev => prev.filter(item => item.id !== id));
+      setDeleteId(null);
+      showToast("Product deleted.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to delete product.");
+    }
   }
 
   const totalSales  = transactions.reduce((s, t) => s + t.total, 0);
@@ -724,7 +759,9 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.length === 0 ? (
+                  {loading ? (
+                    <tr><td colSpan={8} style={{ textAlign: "center", padding: 56, color: "#9ca3af", fontSize: 13 }}>Loading inventory…</td></tr>
+                  ) : filtered.length === 0 ? (
                     <tr><td colSpan={8} style={{ textAlign: "center", padding: 56, color: "#9ca3af", fontSize: 13 }}>No products found.</td></tr>
                   ) : pagedInv.map(itm => {
                     const v = stockVariant(itm.quantity, itm.minStock);
@@ -806,7 +843,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
       {modal && <EditModal item={modal.item} isNew={modal.isNew} onSave={saveItem} onClose={() => setModal(null)} />}
       {deleteId !== null && deleteItem && (
         <DeleteModal name={deleteItem.name}
-          onConfirm={() => { setInventory(p => p.filter(i => i.id !== deleteId)); setDeleteId(null); showToast("Product deleted."); }}
+          onConfirm={() => void deleteProduct(deleteId)}
           onClose={() => setDeleteId(null)}
         />
       )}
@@ -819,5 +856,22 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
 /* ── Root ────────────────────────────────────────────────────────────── */
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  return user ? <Dashboard user={user} onLogout={() => setUser(null)} /> : <LoginPage onLogin={setUser} />;
+  const [checkingAuth, setCheckingAuth] = useState(Boolean(getApiToken()));
+
+  useEffect(() => {
+    if (!getApiToken()) return;
+    api<{ user: User }>("/me")
+      .then(result => setUser(result.user))
+      .catch(() => setApiToken(null))
+      .finally(() => setCheckingAuth(false));
+  }, []);
+
+  async function logout() {
+    try { await api("/logout", { method: "POST" }); } catch { /* Token is cleared locally either way. */ }
+    setApiToken(null);
+    setUser(null);
+  }
+
+  if (checkingAuth) return <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "#6b7280" }}>Loading…</div>;
+  return user ? <Dashboard user={user} onLogout={() => void logout()} /> : <LoginPage onLogin={setUser} />;
 }

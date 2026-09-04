@@ -3,12 +3,26 @@
 namespace Tests\Feature;
 
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class ProductApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Role::findOrCreate('admin');
+        Role::findOrCreate('cashier');
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+    }
 
     public function test_it_lists_products_as_json(): void
     {
@@ -89,6 +103,17 @@ class ProductApiTest extends TestCase
                 'unit',
                 'min_stock',
             ]);
+    }
+
+    public function test_cashier_cannot_change_inventory(): void
+    {
+        $cashier = User::factory()->create();
+        $cashier->assignRole('cashier');
+        Sanctum::actingAs($cashier);
+
+        $this->postJson('/api/products', $this->productData())
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Only administrators can manage inventory.');
     }
 
     private function productData(): array

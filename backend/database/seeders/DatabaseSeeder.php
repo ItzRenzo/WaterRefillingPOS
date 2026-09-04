@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Role;
 
 class DatabaseSeeder extends Seeder
 {
@@ -16,13 +17,22 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::query()->firstOrCreate(
-            ['email' => 'test@example.com'],
-            [
-                'name' => 'Test User',
-                'password' => Hash::make('password'),
-            ],
-        );
+        Role::findOrCreate('admin');
+        Role::findOrCreate('cashier');
+
+        $admin = User::query()->updateOrCreate(['username' => 'admin'], [
+            'name' => 'Maria Santos',
+            'email' => 'admin@rjanewater.local',
+            'password' => Hash::make('admin123'),
+        ]);
+        $admin->syncRoles('admin');
+
+        $cashier = User::query()->updateOrCreate(['username' => 'cashier'], [
+            'name' => 'Rico Dela Cruz',
+            'email' => 'cashier@rjanewater.local',
+            'password' => Hash::make('cashier123'),
+        ]);
+        $cashier->syncRoles('cashier');
 
         $this->call(ProductSeeder::class);
     }
