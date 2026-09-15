@@ -1,4 +1,14 @@
-# Welcome to your Expo app 👋
+# RJane Water Mobile POS
+
+This Expo SDK 57 client uses the Laravel API in `../backend` for authentication,
+inventory, and sales. Copy `.env.example` to `.env.local`, set
+`EXPO_PUBLIC_API_BASE` to an address reachable by the device, start Laravel,
+then run `npm start`. See [SETUP.md](SETUP.md) for emulator and phone addresses.
+
+Development accounts are `admin` / `admin123` and `cashier` / `cashier123`.
+Android and iOS tokens are stored with Expo SecureStore.
+
+## Expo development
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\Sale;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -47,6 +48,13 @@ class ProductController extends Controller
     public function destroy(Request $request, Product $product): JsonResponse
     {
         $this->ensureAdmin($request);
+
+        if (Sale::query()->where('product_id', $product->id)->exists()) {
+            return response()->json([
+                'message' => 'Products with recorded sales cannot be deleted. Mark the product unavailable instead.',
+            ], 409);
+        }
+
         $deletedProduct = $product->only(['id', 'name']);
         $product->delete();
 

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Product;
+use App\Models\Sale;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -82,6 +83,32 @@ class ProductApiTest extends TestCase
             ->assertJsonPath('data.id', $product->id);
 
         $this->assertDatabaseMissing('products', ['id' => $product->id]);
+    }
+
+    public function test_it_preserves_products_that_have_sales_history(): void
+    {
+        $product = Product::query()->create($this->productData());
+        $cashier = User::factory()->create();
+        $cashier->assignRole('cashier');
+        Sale::query()->create([
+            'product_id' => $product->id,
+            'cashier_id' => $cashier->id,
+            'product_name' => $product->name,
+            'cashier_name' => $cashier->name,
+            'quantity' => 1,
+            'unit_price' => $product->price,
+            'total' => $product->price,
+        ]);
+
+        $this->deleteJson("/api/products/{$product->id}")
+            ->assertConflict()
+            ->assertJsonPath(
+                'message',
+                'Products with recorded sales cannot be deleted. Mark the product unavailable instead.',
+            );
+
+        $this->assertDatabaseHas('products', ['id' => $product->id]);
+        $this->assertDatabaseHas('sales', ['product_id' => $product->id]);
     }
 
     public function test_it_returns_json_404_for_a_missing_product(): void
