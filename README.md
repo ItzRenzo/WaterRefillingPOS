@@ -46,6 +46,10 @@ Copy-Item .env.example .env.local
 
 ## Run locally
 
+For production web hosting, follow [Deploy to Vercel](docs/VERCEL.md).
+Vercel hosts the responsive web frontend; the Laravel API and persistent database
+must be hosted separately.
+
 Open a separate terminal for each application.
 
 Backend API:

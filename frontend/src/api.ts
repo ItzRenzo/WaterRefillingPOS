@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE ?? "/api";
+const API_BASE = (import.meta.env.VITE_API_BASE?.trim() || "/api").replace(/\/+$/, "");
 const TOKEN_KEY = "rjane_pos_token";
 
 export function setApiToken(token: string | null): void {
@@ -13,10 +13,11 @@ export function getApiToken(): string | null {
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getApiToken();
   const response = await fetch(`${API_BASE}${path}`, {
-    credentials: "include",
+    credentials: "omit",
     ...options,
     headers: {
       "Content-Type": "application/json",
+      Accept: "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers ?? {}),
     },
