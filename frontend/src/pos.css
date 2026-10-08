@@ -146,6 +146,8 @@ input {
   margin: 53px 12px 14px;
 }
 .nav-active {
+  display: block;
+  text-decoration: none;
   background: #eaf2fe;
   color: #2465c7;
   font-size: 13px;
@@ -649,6 +651,74 @@ td.strong {
   flex: 1;
 }
 @media (max-width: 900px) {
+  .admin-layout {
+    flex-direction: column;
+  }
+  .admin-layout .sidebar {
+    position: sticky;
+    inset: auto;
+    top: 0;
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "brand account" "navigation navigation";
+    gap: 12px;
+    padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
+    border-right: 0;
+    border-bottom: 1px solid #e4ebf4;
+    box-shadow: 0 3px 12px #1c2b3e08;
+  }
+  .admin-layout .side-brand {
+    grid-area: brand;
+    min-width: 0;
+    font-size: 17px;
+    gap: 8px;
+  }
+  .admin-layout .side-brand > div:not(.brand-mark) {
+    display: block;
+  }
+  .admin-layout .brand-mark {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+  }
+  .admin-layout .sidebar nav {
+    grid-area: navigation;
+  }
+  .admin-layout .nav-active {
+    display: block;
+    padding: 10px 12px;
+  }
+  .admin-layout .side-bottom {
+    grid-area: account;
+    display: flex;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    gap: 8px;
+  }
+  .admin-layout .side-bottom .avatar {
+    display: none;
+  }
+  .admin-layout .side-bottom strong {
+    max-width: 75px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .admin-layout .side-bottom button {
+    min-height: 44px;
+    padding: 8px;
+    font-size: 11px;
+  }
+  .admin-layout .workspace {
+    width: 100%;
+    min-width: 0;
+    margin-left: 0;
+  }
+  .admin-layout #admin-overview {
+    scroll-margin-top: 120px;
+  }
   .cashier-fullscreen .checkout-layout {
     grid-template-columns: 1fr;
   }

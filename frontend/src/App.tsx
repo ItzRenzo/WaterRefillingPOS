@@ -614,7 +614,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
   return (
     <>
       <div
-        className={`pos-app ${user.role === "cashier" ? "cashier-fullscreen" : ""}`}
+        className={`pos-app ${user.role === "cashier" ? "cashier-fullscreen" : "admin-layout"}`}
         style={{ "--pos-height": `${viewportHeight}px` } as CSSProperties}
       >
         {user.role === "admin" && (
@@ -626,9 +626,11 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               </div>
             </div>
             <div className="side-caption">WORKSPACE</div>
-            <div className="nav-active">
-              {user.role === "admin" ? "▦  Overview" : "▦  Point of sale"}
-            </div>
+            <nav aria-label="Admin navigation">
+              <a className="nav-active" href="#admin-overview" aria-current="page">
+                ▦ Overview
+              </a>
+            </nav>
             <div className="side-bottom">
               <div className="avatar">{user.name.charAt(0)}</div>
               <div>
@@ -638,7 +640,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
                 </span>
               </div>
               <button title="Sign out" onClick={onLogout}>
-                ↪
+                Sign out
               </button>
             </div>
           </aside>
@@ -665,7 +667,7 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
               )}
             </div>
           </header>
-          <main className="main">
+          <main className="main" id={user.role === "admin" ? "admin-overview" : undefined}>
             <div className="page-heading">
               <div>
                 <span className="eyebrow">
