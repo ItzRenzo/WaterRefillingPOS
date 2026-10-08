@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\SaleController;
+use App\Http\Controllers\Api\StockController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', fn () => response()->json([
@@ -20,5 +21,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::apiResource('products', ProductController::class)
         ->missing(fn () => response()->json(['message' => 'Product not found.'], 404));
     Route::get('/sales', [SaleController::class, 'index']);
+    Route::get('/stocks', [StockController::class, 'index']);
+    Route::post('/stocks', [StockController::class, 'store']);
     Route::post('/sales', [SaleController::class, 'store']);
 });

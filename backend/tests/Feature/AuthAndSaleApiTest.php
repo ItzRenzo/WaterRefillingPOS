@@ -139,6 +139,7 @@ class AuthAndSaleApiTest extends TestCase
         $this->postJson('/api/sales', [
             'product_id' => $product->id,
             'quantity' => 3,
+            'cash_received' => 150, 'payment_method' => 'cash', 'checkout_key' => (string) \Illuminate\Support\Str::uuid(),
         ])->assertCreated()
             ->assertJsonPath('data.quantity', 3)
             ->assertJsonPath('data.total', 105)
@@ -149,6 +150,9 @@ class AuthAndSaleApiTest extends TestCase
             'product_id' => $product->id,
             'cashier_id' => $cashier->id,
             'quantity' => 3,
+            'cash_received' => 150,
+            'change_due' => 45,
+            'payment_method' => 'cash',
         ]);
     }
 
@@ -161,6 +165,7 @@ class AuthAndSaleApiTest extends TestCase
         $this->postJson('/api/sales', [
             'product_id' => $product->id,
             'quantity' => 3,
+            'cash_received' => 150, 'payment_method' => 'cash', 'checkout_key' => (string) \Illuminate\Support\Str::uuid(),
         ])->assertUnprocessable()
             ->assertJsonValidationErrors('quantity');
 
@@ -180,6 +185,9 @@ class AuthAndSaleApiTest extends TestCase
         $this->postJson('/api/sales', [
             'product_id' => $product->id,
             'quantity' => 1,
+            'cash_received' => 100,
+            'payment_method' => 'cash',
+            'checkout_key' => (string) \Illuminate\Support\Str::uuid(),
         ])->assertUnprocessable()
             ->assertJsonValidationErrors('quantity');
 
@@ -204,7 +212,7 @@ class AuthAndSaleApiTest extends TestCase
         $product = Product::query()->create($this->productData());
         Sanctum::actingAs($cashier);
 
-        $this->postJson('/api/sales', ['product_id' => $product->id, 'quantity' => 2])
+        $this->postJson('/api/sales', ['product_id' => $product->id, 'quantity' => 2, 'cash_received' => 100, 'payment_method' => 'cash', 'checkout_key' => (string) \Illuminate\Support\Str::uuid()])
             ->assertCreated();
 
         $this->getJson('/api/sales')

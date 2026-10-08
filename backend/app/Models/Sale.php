@@ -18,6 +18,10 @@ class Sale extends Model
         'quantity',
         'unit_price',
         'total',
+        'cash_received',
+        'change_due',
+        'payment_method',
+        'checkout_key',
     ];
 
     protected function casts(): array
@@ -26,6 +30,8 @@ class Sale extends Model
             'quantity' => 'integer',
             'unit_price' => 'float',
             'total' => 'float',
+            'cash_received' => 'float',
+            'change_due' => 'float',
         ];
     }
 

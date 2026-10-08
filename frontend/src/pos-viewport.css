@@ -1,0 +1,654 @@
+/* The cashier terminal owns the visible viewport. Admin pages retain their normal flow. */
+@media screen {
+  .cashier-fullscreen {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: var(--pos-height, 100dvh);
+    min-height: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+    container: cashier / size;
+  }
+  .cashier-fullscreen .workspace {
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+  }
+  .cashier-fullscreen .topbar {
+    height: 48px;
+    flex: 0 0 48px;
+    padding: 0 max(16px, env(safe-area-inset-right)) 0
+      max(16px, env(safe-area-inset-left));
+    gap: 8px;
+    font-size: 11px;
+  }
+  .cashier-fullscreen .terminal-controls {
+    margin-right: 100px;
+    flex-shrink: 0;
+    gap: 10px;
+  }
+  .cashier-fullscreen .terminal-controls button {
+    padding: 7px 10px;
+  }
+  .cashier-fullscreen .main {
+    min-height: 0;
+    min-width: 0;
+    padding: 14px max(16px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+    overflow: hidden;
+  }
+  .cashier-fullscreen .app-footer {
+    display: none;
+  }
+  .cashier-fullscreen .page-heading {
+    flex-shrink: 0;
+    margin-bottom: 12px;
+    gap: 8px;
+  }
+  .cashier-fullscreen .page-heading h1 {
+    font-size: 24px;
+    line-height: 1.2;
+  }
+  .cashier-fullscreen .page-heading .eyebrow,
+  .cashier-fullscreen .page-heading p {
+    display: none;
+  }
+  .cashier-fullscreen .steps {
+    flex-shrink: 0;
+    margin-bottom: 12px;
+    gap: 24px;
+  }
+  .cashier-fullscreen .steps div {
+    white-space: nowrap;
+  }
+  .cashier-fullscreen .checkout-layout {
+    min-height: 0;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .cashier-fullscreen .selection,
+  .cashier-fullscreen .order {
+    min-height: 0;
+    min-width: 0;
+  }
+  .cashier-fullscreen .panel-heading {
+    flex-shrink: 0;
+    padding: 14px 18px;
+  }
+  .cashier-fullscreen .panel-heading h2 {
+    font-size: 16px;
+  }
+  .cashier-fullscreen .product-grid {
+    min-height: 0;
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
+  .cashier-fullscreen .product-tile {
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 12px 8px;
+    gap: 8px;
+  }
+  .cashier-fullscreen .product-tile .container-art {
+    width: min(55%, 180px);
+    height: clamp(48px, 22cqh, 210px);
+    min-height: 0;
+    flex-shrink: 1;
+    margin: 0;
+  }
+  .cashier-fullscreen .product-tile p {
+    margin: 0;
+    font-weight: 400;
+  }
+  .cashier-fullscreen .product-tile strong {
+    margin: 0;
+    font-size: 24px;
+  }
+  .cashier-fullscreen .product-tile h3 {
+    font-size: 17px;
+  }
+  .cashier-fullscreen .order {
+    padding: 20px;
+  }
+  .cashier-fullscreen .order .eyebrow {
+    margin-bottom: 5px;
+  }
+  .cashier-fullscreen .order h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+  }
+  .cashier-fullscreen .order-item {
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+  }
+  .cashier-fullscreen .order-empty {
+    min-height: 0;
+    padding: 14px;
+  }
+  .cashier-fullscreen .order-total {
+    padding: 16px 0;
+    margin-top: auto;
+  }
+  .cashier-fullscreen .cash-note {
+    display: none;
+  }
+  .cashier-fullscreen button.large {
+    min-height: 44px;
+    padding: 10px;
+    font-size: 13px;
+  }
+  .cashier-fullscreen input {
+    font-size: 16px;
+  }
+  .cashier-fullscreen .quantity-control input {
+    min-width: 0;
+    padding: 8px;
+  }
+  .cashier-fullscreen .payment-layout {
+    min-height: 0;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 20px;
+    align-items: stretch;
+  }
+  .cashier-fullscreen .payment {
+    padding: clamp(12px, 3cqh, 24px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    min-height: 0;
+  }
+  .cashier-fullscreen .payment .eyebrow {
+    margin-bottom: 5px;
+  }
+  .cashier-fullscreen .payment h2 {
+    font-size: 21px;
+  }
+  .cashier-fullscreen .payment-total {
+    padding: 14px 18px;
+    margin: 14px 0;
+    flex-shrink: 0;
+  }
+  .cashier-fullscreen .payment-total strong {
+    font-size: 32px;
+    margin-top: 3px;
+  }
+  .cashier-fullscreen .payment input {
+    padding: 10px 12px;
+    margin-top: 5px;
+    font-size: 20px;
+    min-height: 44px;
+  }
+  .cashier-fullscreen .cash-shortcuts {
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .cashier-fullscreen .cash-shortcuts button {
+    min-height: 36px;
+    padding: 7px 9px;
+  }
+  .cashier-fullscreen .change-row {
+    padding: 12px 0;
+    margin-top: 0;
+    align-items: center;
+  }
+  .cashier-fullscreen .payment > .text-button {
+    margin-top: 4px;
+    min-height: 32px;
+  }
+  .cashier-fullscreen .payment-hint {
+    font-size: 10px;
+    line-height: 1.2;
+    padding-bottom: 6px;
+  }
+  .cashier-fullscreen .payment-aside {
+    align-self: center;
+  }
+  .cashier-fullscreen .receipt-view {
+    min-height: 0;
+    min-width: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .cashier-fullscreen .receipt-status {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    font-size: 17px;
+    margin: 0;
+  }
+  .cashier-fullscreen .receipt-view > h2 {
+    font-size: 18px;
+  }
+  .cashier-fullscreen .receipt-view > p {
+    margin: 0;
+    font-size: 11px;
+  }
+  .receipt-preview {
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+  }
+  .receipt-preview-paper {
+    position: absolute;
+    width: 320px;
+    left: 50%;
+    top: 0;
+    transform-origin: top center;
+  }
+  .cashier-fullscreen .receipt-actions {
+    margin: 0;
+    flex-shrink: 0;
+  }
+  .cashier-fullscreen .receipt-actions button {
+    min-height: 44px;
+  }
+  .cashier-fullscreen .stock-alert,
+  .cashier-fullscreen .main > .error,
+  .cashier-fullscreen .success {
+    position: absolute;
+    z-index: 45;
+    top: 51px;
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    padding: 10px 12px;
+    margin: 0;
+    box-shadow: 0 8px 24px #18334e20;
+  }
+  .cashier-fullscreen .stock-alert {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+  .cashier-fullscreen .stock-alert p {
+    font-size: 11px;
+    line-height: 1.3;
+  }
+  .cashier-fullscreen .stock-alert button {
+    flex-shrink: 0;
+    padding: 9px;
+  }
+  .cashier-fullscreen .chat-assistant {
+    top: 8px;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: auto;
+  }
+  .cashier-fullscreen .chat-launcher {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  .cashier-fullscreen .chat-panel {
+    top: 42px;
+    bottom: auto;
+    height: min(620px, calc(var(--pos-height) - 58px));
+    max-width: calc(100vw - 24px);
+  }
+}
+
+/* Portrait phones: container choices above a compact order strip. */
+@container cashier (width < 700px) {
+  .cashier-fullscreen .topbar > span {
+    font-size: 10px;
+  }
+  .cashier-fullscreen .topbar strong,
+  .cashier-fullscreen .terminal-controls > span {
+    display: none;
+  }
+  .cashier-fullscreen .terminal-controls {
+    margin-right: 90px;
+  }
+  .cashier-fullscreen .main {
+    padding: 8px max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+  .cashier-fullscreen .page-heading {
+    margin-bottom: 7px;
+  }
+  .cashier-fullscreen .page-heading h1 {
+    font-size: 19px;
+  }
+  .cashier-fullscreen .page-heading button {
+    padding: 7px 10px;
+  }
+  .cashier-fullscreen .steps {
+    justify-content: space-between;
+    gap: 4px;
+    margin-bottom: 8px;
+    font-size: 10px;
+  }
+  .cashier-fullscreen .steps div {
+    gap: 4px;
+  }
+  .cashier-fullscreen .steps span {
+    width: 20px;
+    height: 20px;
+  }
+  .cashier-fullscreen .checkout-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+  .cashier-fullscreen .panel-heading {
+    padding: 8px 12px;
+  }
+  .cashier-fullscreen .panel-heading p,
+  .cashier-fullscreen .panel-heading .count-chip {
+    display: none;
+  }
+  .cashier-fullscreen .panel-heading h2 {
+    font-size: 14px;
+  }
+  .cashier-fullscreen .product-grid {
+    padding: 8px;
+    gap: 8px;
+  }
+  .cashier-fullscreen .product-tile {
+    padding: 8px;
+    gap: 5px;
+  }
+  .cashier-fullscreen .product-tile .container-art {
+    height: clamp(36px, 15cqh, 135px);
+    width: 85px;
+  }
+  .cashier-fullscreen .product-tile p {
+    display: none;
+  }
+  .cashier-fullscreen .product-tile h3 {
+    font-size: 14px;
+  }
+  .cashier-fullscreen .product-tile strong {
+    font-size: 18px;
+  }
+  .cashier-fullscreen .selection-dot {
+    width: 16px;
+    height: 16px;
+    top: 8px;
+    right: 8px;
+  }
+  .cashier-fullscreen .order {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(110px, 0.75fr);
+    align-items: center;
+    padding: 10px 12px;
+    gap: 8px 12px;
+  }
+  .cashier-fullscreen .order .eyebrow,
+  .cashier-fullscreen .order h2,
+  .cashier-fullscreen .order-item p,
+  .cashier-fullscreen .order > .muted {
+    display: none;
+  }
+  .cashier-fullscreen .order-item {
+    padding: 0;
+    margin: 0;
+    border: 0;
+    grid-column: 1 / -1;
+    font-size: 12px;
+  }
+  .cashier-fullscreen .order > label {
+    font-size: 10px;
+    grid-column: 1;
+  }
+  .cashier-fullscreen .quantity-control {
+    margin-top: 4px;
+    gap: 4px;
+  }
+  .cashier-fullscreen .quantity-control button {
+    min-height: 40px;
+    width: 36px;
+    padding: 4px;
+  }
+  .cashier-fullscreen .quantity-control input {
+    padding: 4px;
+    min-height: 40px;
+  }
+  .cashier-fullscreen .order-total {
+    padding: 0;
+    margin: 0;
+    border: 0;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+  .cashier-fullscreen .order-total span {
+    font-size: 10px;
+  }
+  .cashier-fullscreen .order-total strong {
+    font-size: 23px;
+  }
+  .cashier-fullscreen .order-empty {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+    padding: 6px;
+    font-size: 11px;
+    min-height: 48px;
+  }
+  .cashier-fullscreen .order > button {
+    grid-column: 1 / -1;
+  }
+  .cashier-fullscreen .payment-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .cashier-fullscreen .payment-aside {
+    display: none;
+  }
+  .cashier-fullscreen .payment {
+    padding: 12px 16px;
+  }
+  .cashier-fullscreen .payment > .eyebrow {
+    display: none;
+  }
+  .cashier-fullscreen .payment h2 {
+    font-size: 18px;
+  }
+  .cashier-fullscreen .cash-shortcuts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .cashier-fullscreen .stock-alert strong {
+    font-size: 12px;
+  }
+  .cashier-fullscreen .stock-alert p {
+    display: none;
+  }
+  .cashier-fullscreen .stock-alert strong::after {
+    content: ". Refresh to update quantities.";
+    font-weight: 400;
+  }
+}
+
+/* Short landscape displays and visible phone keyboards need less decoration. */
+@container cashier (height < 560px) {
+  .cashier-fullscreen .topbar {
+    height: 40px;
+    flex-basis: 40px;
+  }
+  .cashier-fullscreen .main {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .cashier-fullscreen .page-heading {
+    display: none;
+  }
+  .cashier-fullscreen .steps {
+    margin-bottom: 6px;
+    font-size: 10px;
+  }
+  .cashier-fullscreen .steps span {
+    width: 20px;
+    height: 20px;
+  }
+  .cashier-fullscreen .panel-heading {
+    padding: 6px 10px;
+  }
+  .cashier-fullscreen .panel-heading p,
+  .cashier-fullscreen .order .eyebrow,
+  .cashier-fullscreen .order h2,
+  .cashier-fullscreen .order-item p,
+  .cashier-fullscreen .order > .muted {
+    display: none;
+  }
+  .cashier-fullscreen .product-grid {
+    padding: 8px;
+  }
+  .cashier-fullscreen .product-tile {
+    padding: 6px;
+    gap: 4px;
+  }
+  .cashier-fullscreen .product-tile .container-art {
+    height: min(18cqh, 90px);
+  }
+  .cashier-fullscreen .product-tile p {
+    display: none;
+  }
+  .cashier-fullscreen .product-tile h3 {
+    font-size: 13px;
+  }
+  .cashier-fullscreen .product-tile strong {
+    font-size: 18px;
+  }
+  .cashier-fullscreen .order {
+    padding: 10px;
+  }
+  .cashier-fullscreen .order-item {
+    padding: 0;
+    border: 0;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .cashier-fullscreen .quantity-control {
+    margin-top: 4px;
+  }
+  .cashier-fullscreen .quantity-control button,
+  .cashier-fullscreen .quantity-control input {
+    padding: 4px;
+    height: 38px;
+  }
+  .cashier-fullscreen .order-total {
+    padding: 8px 0;
+  }
+  .cashier-fullscreen .order-total strong {
+    font-size: 20px;
+  }
+  .cashier-fullscreen .payment {
+    padding: 8px 12px;
+  }
+  .cashier-fullscreen .payment > .eyebrow,
+  .cashier-fullscreen .payment > p:not(.payment-hint) {
+    display: none;
+  }
+  .cashier-fullscreen .payment h2 {
+    font-size: 16px;
+  }
+  .cashier-fullscreen .payment-total {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 12px;
+    margin: 8px 0;
+  }
+  .cashier-fullscreen .payment-total strong {
+    font-size: 24px;
+    margin: 0;
+  }
+  .cashier-fullscreen .cash-shortcuts {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .cashier-fullscreen .cash-shortcuts button {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 3px;
+    font-size: 9px;
+    min-height: 30px;
+  }
+  .cashier-fullscreen .change-row {
+    padding: 6px 0;
+  }
+  .cashier-fullscreen .change-row strong {
+    font-size: 18px;
+  }
+  .cashier-fullscreen .receipt-status,
+  .cashier-fullscreen .receipt-view > p {
+    display: none;
+  }
+  .cashier-fullscreen .chat-assistant {
+    top: 4px;
+  }
+}
+@container cashier (height < 370px) {
+  .cashier-fullscreen .steps,
+  .cashier-fullscreen .payment h2,
+  .cashier-fullscreen .cash-shortcuts,
+  .cashier-fullscreen .product-tile .container-art {
+    display: none;
+  }
+  .cashier-fullscreen .payment-total {
+    margin: 0 0 4px;
+    padding: 4px 8px;
+  }
+  .cashier-fullscreen .payment input {
+    margin-top: 3px;
+    padding: 5px 8px;
+    min-height: 36px;
+  }
+  .cashier-fullscreen .payment label {
+    font-size: 11px;
+  }
+  .cashier-fullscreen .payment-hint {
+    display: none;
+  }
+  .cashier-fullscreen .payment > .text-button {
+    min-height: 24px;
+    padding: 4px 0;
+  }
+  .cashier-fullscreen button.large {
+    min-height: 36px;
+    padding: 7px;
+  }
+}
+@container cashier (width < 700px) and (height < 430px) {
+  .cashier-fullscreen .product-tile .container-art,
+  .cashier-fullscreen .selection .panel-heading {
+    display: none;
+  }
+}
+@container cashier (width >= 520px) and (height < 560px) {
+  .cashier-fullscreen .checkout-layout {
+    grid-template-columns: minmax(0, 1fr) 240px;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .cashier-fullscreen .order {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+  .cashier-fullscreen .order-total {
+    flex-direction: row;
+    align-items: center;
+    margin-top: auto;
+  }
+}

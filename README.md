@@ -117,7 +117,36 @@ start a new chat, reload, or sign out; closing/reopening the panel preserves the
 The feature tests mock Gemini so tests never use your key or consume provider quota. A real Gemini
 response requires your configured API key and internet access.
 
-## Checks
+## Purified-water POS workflow
+
+The web cashier terminal sells purified water in two containers: a standard blue gallon
+and a 500 mL plastic bottle. Select a container and quantity, continue to cash payment,
+enter the cash received, and complete the sale. The receipt includes the total, cash,
+change, cashier, and receipt number. Print receipt opens the browser print dialog;
+receipts can also be reprinted from recent transactions.
+
+The administrator dashboard shows both available stock quantities, today's cash revenue,
+recent transactions, and stock additions. Add stock increases inventory immediately.
+Open cashier terminals check for new stock every five seconds and prompt staff to Refresh.
+
+The local database is `backend/database/seeded.sqlite`, configured through the ignored
+`backend/.env`. Run `php artisan migrate --seed` to apply the schema and sample data.
+Seeders provide the two active products, 50 historical sample cash sales, and opening
+inventory records. Old sample products are retired, preserving any historical references.
+Rerunning seeds preserves stock quantities and does not duplicate the sample sales.
+
+| Role | Username | Password |
+| --- | --- | --- |
+| Admin | admin | admin123 |
+| Cashier (Walton) | walton | cashier123 |
+
+`POST /api/sales` requires `product_id`, `quantity`, `cash_received`,
+`payment_method: "cash"`, and a UUID `checkout_key`. Reuse that key when retrying the same
+payment to avoid a duplicate sale. `POST /api/stocks` is admin-only and accepts
+`product_id`, a positive integer `quantity`, and an optional `note`. `GET /api/stocks`
+returns recent additions and a `version` cursor for cashier notifications.
+
+## Validation commands
 
 ```powershell
 cd backend

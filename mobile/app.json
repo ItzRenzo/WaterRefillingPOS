@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "RJane Water Station",
     "slug": "mobile",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/expo.icon"
     },

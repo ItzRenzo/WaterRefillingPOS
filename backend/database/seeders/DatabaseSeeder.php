@@ -21,19 +21,20 @@ class DatabaseSeeder extends Seeder
         Role::findOrCreate('cashier');
 
         $admin = User::query()->updateOrCreate(['username' => 'admin'], [
-            'name' => 'Maria Santos',
+            'name' => 'Admin',
             'email' => 'admin@rjanewater.local',
             'password' => Hash::make('admin123'),
         ]);
         $admin->syncRoles('admin');
 
-        $cashier = User::query()->updateOrCreate(['username' => 'cashier'], [
-            'name' => 'Rico Dela Cruz',
-            'email' => 'cashier@rjanewater.local',
+        $cashier = User::query()->updateOrCreate(['username' => 'walton'], [
+            'name' => 'Walton',
+            'email' => 'walton@rjanewater.local',
             'password' => Hash::make('cashier123'),
         ]);
         $cashier->syncRoles('cashier');
 
         $this->call(ProductSeeder::class);
+        $this->call(PosHistorySeeder::class);
     }
 }

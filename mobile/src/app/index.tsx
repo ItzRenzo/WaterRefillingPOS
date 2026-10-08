@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
+  AppState,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   RefreshControl,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -16,181 +16,122 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-
+import * as Crypto from "expo-crypto";
 import { api, isUnauthorized, restoreApiToken, setApiToken } from "@/api";
 import ChatAssistant from "@/components/chat-assistant";
-
-type Role = "admin" | "cashier";
-type User = { id: number; name: string; username: string; role: Role };
-type Product = {
-  id: number;
-  name: string;
-  unit: string;
-  stock: number;
-  min_stock: number;
-  price: number;
-  status: "available" | "unavailable";
-  updated_at: string;
-};
-type Sale = {
-  id: number;
-  product_name: string;
-  quantity: number;
-  total: number;
-  cashier_name: string;
-  created_at: string;
-};
-type ProductInput = Omit<Product, "id" | "status" | "updated_at">;
-
-const COLORS = {
-  navy: "#071A35",
-  navySoft: "#102B50",
-  blue: "#1769E0",
-  cyan: "#27B7E6",
-  sky: "#EAF6FC",
-  canvas: "#F3F7FA",
-  card: "#FFFFFF",
-  ink: "#10213F",
-  muted: "#6F7F93",
-  line: "#DDE7EF",
-  success: "#16845B",
-  successSoft: "#E7F7F0",
-  warning: "#B76705",
-  warningSoft: "#FFF4DD",
-  danger: "#C93C4A",
-  dangerSoft: "#FDECEF",
-};
-const API_ERROR = "The request could not be completed.";
-
-function money(value: number): string {
-  return `₱${Number(value).toLocaleString("en-PH", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function greeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
-
-function stockStatus(product: Product) {
-  if (product.status === "unavailable") {
-    return { label: "Unavailable", color: COLORS.muted, background: "#EDF1F5" };
-  }
-  if (product.stock === 0 || product.stock <= product.min_stock / 2) {
-    return {
-      label: "Critical",
-      color: COLORS.danger,
-      background: COLORS.dangerSoft,
-    };
-  }
-  if (product.stock <= product.min_stock) {
-    return {
-      label: "Low stock",
-      color: COLORS.warning,
-      background: COLORS.warningSoft,
-    };
-  }
-  return {
-    label: "In stock",
-    color: COLORS.success,
-    background: COLORS.successSoft,
-  };
-}
-
-function Field({
+import WaterContainer from "@/components/water-container";
+import {
+  date,
+  isBottle,
   label,
-  value,
-  onChange,
-  placeholder,
-  secure = false,
-  keyboard = "default",
-  onSubmit,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  secure?: boolean;
-  keyboard?: "default" | "decimal-pad" | "number-pad";
-  onSubmit?: () => void;
-}) {
-  return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor="#9AA8B8"
-        secureTextEntry={secure}
-        keyboardType={keyboard}
-        autoCapitalize="none"
-        autoCorrect={false}
-        returnKeyType={onSubmit ? "done" : "next"}
-        onSubmitEditing={onSubmit}
-        style={styles.input}
-      />
-    </View>
-  );
-}
+  message,
+  money,
+  receiptNumber,
+  type Product,
+  type Sale,
+  type Stock,
+  type User,
+} from "@/lib/pos";
+import { printReceipt } from "@/lib/receipt";
+import { s, C } from "@/styles/pos";
 
-function PrimaryButton({
-  label,
+type Summary = { count: number; revenue: number };
+function Button({
+  title,
   onPress,
-  busy = false,
   disabled = false,
+  busy = false,
+  secondary = false,
+  small = false,
 }: {
-  label: string;
+  title: string;
   onPress: () => void;
-  busy?: boolean;
   disabled?: boolean;
+  busy?: boolean;
+  secondary?: boolean;
+  small?: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      disabled={busy || disabled}
+      disabled={disabled || busy}
       onPress={onPress}
       style={({ pressed }) => [
-        styles.primaryButton,
-        (busy || disabled) && styles.disabled,
-        pressed && styles.pressed,
+        s.button,
+        secondary && s.secondaryButton,
+        small && s.smallButton,
+        (disabled || busy) && s.disabled,
+        pressed && s.pressed,
       ]}
     >
       {busy ? (
-        <ActivityIndicator color="#FFFFFF" />
+        <ActivityIndicator color={secondary ? C.blue : "white"} />
       ) : (
-        <Text style={styles.primaryButtonText}>{label}</Text>
+        <Text style={[s.buttonText, secondary && s.secondaryText]}>
+          {title}
+        </Text>
       )}
     </Pressable>
   );
 }
-
+function Field({
+  title,
+  value,
+  onChange,
+  secure = false,
+  numeric = false,
+  disabled = false,
+}: {
+  title: string;
+  value: string;
+  onChange: (value: string) => void;
+  secure?: boolean;
+  numeric?: boolean;
+  disabled?: boolean;
+}) {
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  return (
+    <View style={s.field}>
+      <Text style={s.fieldLabel}>{title}</Text>
+      <View style={s.passwordField}>
+      <TextInput
+        accessibilityLabel={title}
+        value={value}
+        onChangeText={onChange}
+        editable={!disabled}
+        secureTextEntry={secure && !passwordVisible}
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType={numeric ? "decimal-pad" : "default"}
+        style={[s.input, s.passwordInput, secure && s.passwordSpacing]}
+      />
+      {secure && <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={passwordVisible ? "Hide password" : "Show password"}
+        accessibilityState={{ selected: passwordVisible, disabled }}
+        disabled={disabled}
+        onPress={() => setPasswordVisible(visible => !visible)}
+        style={[s.passwordToggle, disabled && s.disabled]}
+      ><Text style={s.passwordToggleText}>{passwordVisible ? "Hide" : "Show"}</Text></Pressable>}
+      </View>
+    </View>
+  );
+}
 function Login({
   onLogin,
 }: {
   onLogin: (user: User, token: string) => Promise<void>;
 }) {
-  const { width } = useWindowDimensions();
-  const loginWidth = Math.min(Math.max(width - 32, 280), 470);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-
-  async function submit() {
-    if (!username.trim() || !password) {
-      setError("Enter your username and password.");
-      return;
-    }
-
+  async function signIn() {
+    if (!username.trim() || !password || busy) return;
     setBusy(true);
     setError("");
     try {
-      const result = await api<{ token: string; user: User }>("/login", {
+      const result = await api<{ user: User; token: string }>("/login", {
         method: "POST",
         body: JSON.stringify({
           username: username.trim(),
@@ -199,1680 +140,1089 @@ function Login({
         }),
       });
       await onLogin(result.user, result.token);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : API_ERROR,
-      );
+    } catch (error) {
+      setError(message(error));
     } finally {
       setBusy(false);
     }
   }
-
   return (
-    <SafeAreaView style={styles.loginScreen} edges={["top", "bottom"]}>
-      <StatusBar style="light" />
-      <View style={styles.loginOrbLarge} />
-      <View style={styles.loginOrbSmall} />
-      <ScrollView
-        contentContainerStyle={styles.loginScroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <SafeAreaView style={s.screen}>
+      <StatusBar style="dark" />
+      <KeyboardAvoidingView
+        style={s.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View style={[styles.loginContainer, { width: loginWidth }]}>
-          <View style={styles.loginBrand}>
-            <View style={styles.logoLarge}>
-              <Text style={styles.logoLetter}>R</Text>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={s.loginScroll}
+        >
+          <View style={s.loginCard}>
+            <View style={s.brandMark}>
+              <Text style={s.brandLetters}>RJ</Text>
             </View>
-            <Text style={styles.loginBrandName}>RJane Water</Text>
-            <Text style={styles.loginBrandCaption}>
-              REFILLING STATION · POS
-            </Text>
-          </View>
-
-          <View style={styles.loginCard}>
-            <Text style={styles.loginEyebrow}>WELCOME BACK</Text>
-            <Text style={styles.loginTitle}>Sign in to continue</Text>
-            <Text style={styles.loginSubtitle}>
-              Manage inventory and sales from anywhere.
-            </Text>
-
-            <View style={styles.loginFields}>
-              <Field
-                label="Username"
-                value={username}
-                onChange={setUsername}
-                placeholder="Enter username"
-              />
-              <Field
-                label="Password"
-                value={password}
-                onChange={setPassword}
-                placeholder="Enter password"
-                secure
-                onSubmit={() => void submit()}
-              />
-            </View>
-
-            {error ? (
-              <View style={styles.inlineError}>
-                <Text style={styles.inlineErrorIcon}>!</Text>
-                <Text style={styles.inlineErrorText}>{error}</Text>
-              </View>
-            ) : null}
-
-            <PrimaryButton
-              label="Sign in"
-              onPress={() => void submit()}
-              busy={busy}
+            <Text style={s.loginBrand}>RJane Water Station</Text>
+            <Text style={s.eyebrow}>WATER REFILLING POS</Text>
+            <Text style={s.loginTitle}>Welcome back</Text>
+            <Text style={s.subtitle}>Sign in to start your shift.</Text>
+            <Field
+              title="Username"
+              value={username}
+              onChange={setUsername}
+              disabled={busy}
             />
+            <Field
+              title="Password"
+              value={password}
+              onChange={setPassword}
+              secure
+              disabled={busy}
+            />
+            {error ? (
+              <Text style={s.errorText} accessibilityRole="alert">
+                {error}
+              </Text>
+            ) : null}
+            <Button
+              title="Sign in"
+              onPress={() => void signIn()}
+              busy={busy}
+              disabled={!username.trim() || !password}
+            />
+            <Text style={s.loginFooter}>Fresh water. Smooth service.</Text>
           </View>
-          <Text style={styles.loginFooter}>
-            Secure access for authorized staff
-          </Text>
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
-function ProductModal({
-  product,
-  onClose,
-  onSave,
-}: {
-  product?: Product;
-  onClose: () => void;
-  onSave: (data: ProductInput) => Promise<boolean>;
-}) {
-  const [name, setName] = useState(product?.name ?? "");
-  const [unit, setUnit] = useState(product?.unit ?? "5 Gallon");
-  const [price, setPrice] = useState(String(product?.price ?? 30));
-  const [stock, setStock] = useState(String(product?.stock ?? 0));
-  const [minimum, setMinimum] = useState(String(product?.min_stock ?? 10));
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function save() {
-    const numericPrice = Number(price);
-    const numericStock = Number(stock);
-    const numericMinimum = Number(minimum);
-
-    if (!name.trim() || !unit.trim()) {
-      setError("Product name and unit are required.");
-      return;
-    }
-    if (!Number.isFinite(numericPrice) || numericPrice < 0) {
-      setError("Enter a valid price.");
-      return;
-    }
-    if (
-      !Number.isInteger(numericStock) ||
-      numericStock < 0 ||
-      !Number.isInteger(numericMinimum) ||
-      numericMinimum < 0
-    ) {
-      setError("Stock values must be whole numbers of zero or more.");
-      return;
-    }
-
-    setBusy(true);
-    setError("");
-    try {
-      await onSave({
-        name: name.trim(),
-        unit: unit.trim(),
-        price: numericPrice,
-        stock: numericStock,
-        min_stock: numericMinimum,
-      });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Modal
-      visible
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
-      <KeyboardAvoidingView
-        style={styles.modalBackdrop}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <Pressable style={styles.modalDismissArea} onPress={onClose} />
-        <SafeAreaView style={styles.sheet} edges={["bottom"]}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <View>
-              <Text style={styles.sheetEyebrow}>INVENTORY</Text>
-              <Text style={styles.sheetTitle}>
-                {product ? "Edit product" : "New product"}
-              </Text>
-            </View>
-            <Pressable
-              accessibilityLabel="Close"
-              hitSlop={12}
-              onPress={onClose}
-              style={styles.closeButton}
-            >
-              <Text style={styles.closeButtonText}>×</Text>
-            </Pressable>
-          </View>
-
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <Field
-              label="Product name"
-              value={name}
-              onChange={setName}
-              placeholder="e.g. Purified Water"
-            />
-            <Field
-              label="Unit"
-              value={unit}
-              onChange={setUnit}
-              placeholder="e.g. 5 Gallon"
-            />
-            <View style={styles.fieldRow}>
-              <View style={styles.fieldHalf}>
-                <Field
-                  label="Price"
-                  value={price}
-                  onChange={setPrice}
-                  keyboard="decimal-pad"
-                />
-              </View>
-              <View style={styles.fieldHalf}>
-                <Field
-                  label="Stock"
-                  value={stock}
-                  onChange={setStock}
-                  keyboard="number-pad"
-                />
-              </View>
-            </View>
-            <Field
-              label="Low-stock alert at"
-              value={minimum}
-              onChange={setMinimum}
-              keyboard="number-pad"
-            />
-            {error ? <Text style={styles.formError}>{error}</Text> : null}
-            <View style={styles.sheetActions}>
-              <Pressable
-                onPress={onClose}
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={styles.secondaryButtonText}>Cancel</Text>
-              </Pressable>
-              <View style={styles.sheetPrimaryAction}>
-                <PrimaryButton
-                  label={product ? "Save changes" : "Add product"}
-                  onPress={() => void save()}
-                  busy={busy}
-                />
-              </View>
-            </View>
-          </ScrollView>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
-    </Modal>
+function Receipt({ sale }: { sale: Sale }) {
+  const row = (name: string, value: string, total = false) => (
+    <View style={s.receiptRow}>
+      <Text style={[s.receiptText, total && s.receiptTotal]}>{name}</Text>
+      <Text style={[s.receiptText, total && s.receiptTotal]}>{value}</Text>
+    </View>
   );
-}
-
-function SaleModal({
-  product,
-  onClose,
-  onSell,
-}: {
-  product: Product;
-  onClose: () => void;
-  onSell: (quantity: number) => Promise<boolean>;
-}) {
-  const [quantity, setQuantity] = useState(1);
-  const [busy, setBusy] = useState(false);
-
-  async function sell() {
-    setBusy(true);
-    try {
-      await onSell(quantity);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
-    <Modal
-      visible
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-      statusBarTranslucent
-    >
-      <View style={styles.modalBackdrop}>
-        <Pressable style={styles.modalDismissArea} onPress={onClose} />
-        <SafeAreaView style={styles.sheet} edges={["bottom"]}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <View>
-              <Text style={styles.sheetEyebrow}>NEW TRANSACTION</Text>
-              <Text style={styles.sheetTitle}>Process sale</Text>
-            </View>
-            <Pressable
-              accessibilityLabel="Close"
-              hitSlop={12}
-              onPress={onClose}
-              style={styles.closeButton}
-            >
-              <Text style={styles.closeButtonText}>×</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.saleProductSummary}>
-            <View style={styles.saleProductIcon}>
-              <Text style={styles.saleProductIconText}>W</Text>
-            </View>
-            <View style={styles.flexOne}>
-              <Text style={styles.saleProductName}>{product.name}</Text>
-              <Text style={styles.mutedText}>
-                {money(product.price)} per {product.unit}
-              </Text>
-            </View>
-            <Text style={styles.availableText}>{product.stock} left</Text>
-          </View>
-
-          <Text style={styles.quantityLabel}>QUANTITY</Text>
-          <View style={styles.stepper}>
-            <Pressable
-              accessibilityLabel="Decrease quantity"
-              disabled={quantity <= 1}
-              onPress={() => setQuantity((current) => Math.max(1, current - 1))}
-              style={({ pressed }) => [
-                styles.stepButton,
-                quantity <= 1 && styles.stepDisabled,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={styles.stepButtonText}>−</Text>
-            </Pressable>
-            <View style={styles.quantityValueWrap}>
-              <Text style={styles.quantityValue}>{quantity}</Text>
-              <Text style={styles.quantityUnit}>{product.unit}</Text>
-            </View>
-            <Pressable
-              accessibilityLabel="Increase quantity"
-              disabled={quantity >= product.stock}
-              onPress={() =>
-                setQuantity((current) => Math.min(product.stock, current + 1))
-              }
-              style={({ pressed }) => [
-                styles.stepButton,
-                quantity >= product.stock && styles.stepDisabled,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={styles.stepButtonText}>+</Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.saleTotalRow}>
-            <View>
-              <Text style={styles.saleTotalLabel}>TOTAL DUE</Text>
-              <Text style={styles.mutedText}>
-                {quantity} × {money(product.price)}
-              </Text>
-            </View>
-            <Text style={styles.saleTotalValue}>
-              {money(quantity * product.price)}
-            </Text>
-          </View>
-
-          <PrimaryButton
-            label="Confirm sale"
-            onPress={() => void sell()}
-            busy={busy}
-          />
-        </SafeAreaView>
-      </View>
-    </Modal>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  helper,
-}: {
-  label: string;
-  value: string;
-  helper: string;
-}) {
-  return (
-    <View style={styles.metricCard}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
-      <Text style={styles.metricHelper}>{helper}</Text>
+    <View style={s.receiptPaper}>
+      <Text style={s.receiptBrand}>RJANE WATER STATION</Text>
+      <Text style={s.receiptCenter}>
+        Purified drinking water · Cash receipt
+      </Text>
+      <View style={s.receiptRule} />
+      {row("Receipt", receiptNumber(sale))}
+      {row("Date", date(sale.created_at))}
+      {row("Cashier", sale.cashier_name)}
+      <View style={s.receiptRule} />
+      <Text style={[s.receiptText, s.bold]}>{sale.product_name}</Text>
+      {row(`${sale.quantity} × ${money(sale.unit_price)}`, money(sale.total))}
+      <View style={s.receiptRule} />
+      {row("TOTAL", money(sale.total), true)}
+      {row(
+        "Cash received",
+        sale.cash_received == null ? "Not recorded" : money(sale.cash_received),
+      )}
+      {row(
+        "Change",
+        sale.change_due == null ? "Not recorded" : money(sale.change_due),
+      )}
+      <View style={s.receiptRule} />
+      <Text style={s.receiptCenter}>Thank you for choosing RJane!</Text>
     </View>
   );
 }
-
-function EmptyState({ title, message }: { title: string; message: string }) {
+function ReceiptPreview({ sale }: { sale: Sale }) {
+  const [frame, setFrame] = useState({ width: 300, height: 350 });
+  const [paperHeight, setPaperHeight] = useState(350);
+  const scale = Math.min(1, frame.width / 300, frame.height / paperHeight);
   return (
-    <View style={styles.emptyCard}>
-      <View style={styles.emptyIcon}>
-        <Text style={styles.emptyIconText}>W</Text>
+    <View
+      style={s.receiptPreview}
+      onLayout={(event) => setFrame(event.nativeEvent.layout)}
+    >
+      <View
+        onLayout={(event) => setPaperHeight(event.nativeEvent.layout.height)}
+        style={[
+          s.receiptPosition,
+          { transform: [{ scale }], transformOrigin: "top center" },
+        ]}
+      >
+        <Receipt sale={sale} />
       </View>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptyMessage}>{message}</Text>
     </View>
   );
 }
 
 export default function HomeScreen() {
-  const { width } = useWindowDimensions();
-  const compact = width < 375;
-  const contentWidth = Math.min(Math.max(width - 28, 292), 720);
+  const { width, height } = useWindowDimensions();
+  const wide = width >= 650 && width > height;
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [checking, setChecking] = useState(true);
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
-  const [tab, setTab] = useState<"inventory" | "transactions">("inventory");
-  const [search, setSearch] = useState("");
+  const [stocks, setStocks] = useState<Stock[]>([]);
+  const [summary, setSummary] = useState<Summary>({ count: 0, revenue: 0 });
   const [loading, setLoading] = useState(false);
-  const [editor, setEditor] = useState<Product | null | undefined>(undefined);
-  const [saleProduct, setSaleProduct] = useState<Product | null>(null);
+  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const filteredProducts = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return query
-      ? products.filter((product) => product.name.toLowerCase().includes(query))
-      : products;
-  }, [products, search]);
-
-  const revenue = sales.reduce((sum, sale) => sum + Number(sale.total), 0);
-  const stockCount = products.reduce((sum, product) => sum + product.stock, 0);
-  const attentionCount = products.filter(
-    (product) =>
-      product.stock <= product.min_stock || product.status === "unavailable",
-  ).length;
-
-  const showNotice = useCallback((message: string) => {
-    if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    setNotice(message);
-    noticeTimer.current = setTimeout(() => setNotice(""), 3200);
+  const [newStock, setNewStock] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const stockVersion = useRef<number | null>(null);
+  const refreshLock = useRef(false);
+  const operationLock = useRef(false);
+  const pollLock = useRef(false);
+  const [step, setStep] = useState<"select" | "payment" | "receipt">("select");
+  const [selected, setSelected] = useState<number | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [cash, setCash] = useState("");
+  const [receipt, setReceipt] = useState<Sale | null>(null);
+  const [busy, setBusy] = useState(false);
+  const checkout = useRef({ payload: "", key: "" });
+  const [contentHeight, setContentHeight] = useState(height - 170);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  useEffect(() => {
+    const shown = Keyboard.addListener("keyboardDidShow", () =>
+      setKeyboardVisible(true),
+    );
+    const hidden = Keyboard.addListener("keyboardDidHide", () =>
+      setKeyboardVisible(false),
+    );
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
   }, []);
-
-  useEffect(
-    () => () => {
-      if (noticeTimer.current) clearTimeout(noticeTimer.current);
-    },
-    [],
-  );
-
+  const [restock, setRestock] = useState<Product | null>(null);
+  const [stockQuantity, setStockQuantity] = useState("");
+  const [stockNote, setStockNote] = useState("");
+  const [salePage, setSalePage] = useState(1);
+  const [stockPage, setStockPage] = useState(1);
+  const [printing, setPrinting] = useState(false);
+  const compact = contentHeight < 390;
+  const tiny = contentHeight < 260;
   const clearSession = useCallback(async () => {
+    await setApiToken(null);
     setUser(null);
     setToken(null);
     setProducts([]);
     setSales([]);
-    await setApiToken(null);
+    setStocks([]);
+    stockVersion.current = null;
+    setReceipt(null);
+    setStep("select");
+    setSelected(null);
+    setError("");
+    setNewStock(false);
   }, []);
-
   useEffect(() => {
     let active = true;
-    async function restoreSession() {
+    (async () => {
       try {
-        const storedToken = await restoreApiToken();
-        if (!storedToken) return;
-        const result = await api<{ user: User }>("/me", {}, storedToken);
+        const saved = await restoreApiToken();
+        if (!saved) return;
+        const result = await api<{ user: User }>("/me", {}, saved);
         if (active) {
-          setToken(storedToken);
           setUser(result.user);
+          setToken(saved);
         }
       } catch (error) {
         if (isUnauthorized(error)) await setApiToken(null);
-        else if (active)
-          Alert.alert(
-            "Unable to restore session",
-            error instanceof Error ? error.message : API_ERROR,
-          );
       } finally {
-        if (active) setCheckingAuth(false);
+        if (active) setChecking(false);
       }
-    }
-    void restoreSession();
+    })();
     return () => {
       active = false;
     };
   }, []);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [productResult, saleResult] = await Promise.all([
-        api<{ data: Product[] }>("/products", {}, token),
-        api<{ data: Sale[] }>("/sales", {}, token),
-      ]);
-      setProducts(productResult.data);
-      setSales(saleResult.data);
-    } catch (error) {
-      if (isUnauthorized(error)) await clearSession();
-      else
-        Alert.alert(
-          "Unable to refresh",
-          error instanceof Error ? error.message : API_ERROR,
+  const refresh = useCallback(
+    async (silent = false) => {
+      if (!token || refreshLock.current) return;
+      refreshLock.current = true;
+      if (!silent) setLoading(true);
+      try {
+        const log = await api<{ data: Stock[]; version: number }>(
+          "/stocks",
+          {},
+          token,
         );
-    } finally {
-      setLoading(false);
-    }
-  }, [clearSession, token]);
-
+        const [inventory, transactions] = await Promise.all([
+          api<{ data: Product[] }>("/products", {}, token),
+          api<{ data: Sale[]; summary: Summary }>("/sales", {}, token),
+        ]);
+        setProducts(
+          inventory.data
+            .filter((item) => item.status === "available")
+            .sort((a, b) => Number(isBottle(a)) - Number(isBottle(b))),
+        );
+        setSales(transactions.data);
+        setSummary(transactions.summary);
+        setStocks(log.data);
+        stockVersion.current = log.version;
+        setNewStock(false);
+        setOffline(false);
+        if (!silent) {
+          setError("");
+          setNotice("");
+        }
+      } catch (error) {
+        if (isUnauthorized(error)) await clearSession();
+        else {
+          setOffline(true);
+          if (!silent) setError(message(error));
+        }
+      } finally {
+        refreshLock.current = false;
+        if (!silent) setLoading(false);
+      }
+    },
+    [token, clearSession],
+  );
   useEffect(() => {
-    if (!token) return;
-    const timer = setTimeout(() => void load(), 0);
+    const timer = setTimeout(() => void refresh(), 0);
     return () => clearTimeout(timer);
-  }, [load, token]);
-
-  async function saveProduct(data: ProductInput): Promise<boolean> {
-    try {
-      const editing = editor !== null && editor !== undefined;
-      const result = await api<{ data: Product }>(
-        editing ? `/products/${editor.id}` : "/products",
-        {
-          method: editing ? "PUT" : "POST",
-          body: JSON.stringify({
-            ...data,
-            description: null,
-            status: "available",
-          }),
-        },
-        token,
-      );
-      setProducts((current) =>
-        editing
-          ? current.map((item) =>
-              item.id === result.data.id ? result.data : item,
-            )
-          : [result.data, ...current],
-      );
-      setEditor(undefined);
-      showNotice(
-        `${result.data.name} ${editing ? "updated" : "added"} successfully.`,
-      );
-      return true;
-    } catch (error) {
-      if (isUnauthorized(error)) await clearSession();
-      else
-        Alert.alert(
-          "Unable to save product",
-          error instanceof Error ? error.message : API_ERROR,
-        );
-      return false;
-    }
+  }, [refresh]);
+  useEffect(() => {
+    if (!token || !user) return;
+    let active = true;
+    const poll = async () => {
+      if (
+        pollLock.current ||
+        refreshLock.current ||
+        operationLock.current ||
+        AppState.currentState === "background"
+      )
+        return;
+      pollLock.current = true;
+      try {
+        if (user.role === "admin") await refresh(true);
+        else {
+          const log = await api<{ version: number }>("/stocks", {}, token);
+          if (
+            active &&
+            stockVersion.current !== null &&
+            log.version > stockVersion.current
+          )
+            setNewStock(true);
+          if (active) setOffline(false);
+        }
+      } catch (error) {
+        if (isUnauthorized(error)) await clearSession();
+        else if (active) setOffline(true);
+      } finally {
+        pollLock.current = false;
+      }
+    };
+    const timer = setInterval(() => void poll(), 5000);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void poll();
+    });
+    return () => {
+      active = false;
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [token, user, refresh, clearSession]);
+  async function login(account: User, authToken: string) {
+    await setApiToken(authToken);
+    setUser(account);
+    setToken(authToken);
   }
-
-  async function sell(quantity: number): Promise<boolean> {
-    if (!saleProduct) return false;
+  async function logout() {
+    if (operationLock.current) return;
     try {
-      const soldProduct = saleProduct;
+      await api("/logout", { method: "POST" }, token);
+    } catch {
+      /* Local logout is always available. */
+    }
+    await clearSession();
+  }
+  const product = products.find((item) => item.id === selected);
+  const total = product
+    ? (Math.round(Number(product.price) * 100) * quantity) / 100
+    : 0;
+  const validQuantity =
+    !!product &&
+    Number.isInteger(quantity) &&
+    quantity > 0 &&
+    quantity <= product.stock;
+  const change =
+    (Math.round(Number(cash) * 100) - Math.round(total * 100)) / 100;
+  const validCash =
+    /^\d+(\.\d{1,2})?$/.test(cash) && Number(cash) <= 1000000 && change >= 0;
+  function reset() {
+    Keyboard.dismiss();
+    setStep("select");
+    setSelected(null);
+    setQuantity(1);
+    setCash("");
+    setReceipt(null);
+    checkout.current = { payload: "", key: "" };
+    setError("");
+  }
+  async function pay() {
+    if (!product || !validQuantity || !validCash || operationLock.current)
+      return;
+    operationLock.current = true;
+    setBusy(true);
+    setError("");
+    Keyboard.dismiss();
+    try {
+      const payload = `${product.id}:${quantity}:${Number(cash)}`;
+      if (checkout.current.payload !== payload)
+        checkout.current = { payload, key: Crypto.randomUUID() };
       const result = await api<{ data: Sale; product: Product }>(
         "/sales",
         {
           method: "POST",
-          body: JSON.stringify({ product_id: soldProduct.id, quantity }),
+          body: JSON.stringify({
+            product_id: product.id,
+            quantity,
+            cash_received: Number(cash),
+            payment_method: "cash",
+            checkout_key: checkout.current.key,
+          }),
         },
         token,
       );
-      setProducts((current) =>
-        current.map((item) =>
+      setReceipt(result.data);
+      setProducts((items) =>
+        items.map((item) =>
           item.id === result.product.id ? result.product : item,
         ),
       );
-      setSales((current) => [result.data, ...current]);
-      setSaleProduct(null);
-      showNotice(
-        `${quantity} ${soldProduct.unit} sold for ${money(result.data.total)}.`,
-      );
-      return true;
+      setStep("receipt");
+      void refresh(true);
     } catch (error) {
       if (isUnauthorized(error)) await clearSession();
-      else
-        Alert.alert(
-          "Unable to process sale",
-          error instanceof Error ? error.message : API_ERROR,
-        );
-      return false;
-    }
-  }
-
-  function remove(product: Product) {
-    Alert.alert(
-      "Delete product?",
-      `${product.name} will be removed from inventory.`,
-      [
-        { text: "Keep product", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await api(`/products/${product.id}`, { method: "DELETE" }, token);
-              setProducts((current) =>
-                current.filter((item) => item.id !== product.id),
-              );
-              showNotice(`${product.name} deleted.`);
-            } catch (error) {
-              if (isUnauthorized(error)) await clearSession();
-              else
-                Alert.alert(
-                  "Unable to delete product",
-                  error instanceof Error ? error.message : API_ERROR,
-                );
-            }
-          },
-        },
-      ],
-    );
-  }
-
-  async function logout() {
-    try {
-      await api("/logout", { method: "POST" }, token);
-    } catch (error) {
-      if (!isUnauthorized(error)) {
-        Alert.alert(
-          "Signed out locally",
-          "The server could not be reached, but this device is now signed out.",
-        );
-      }
+      else setError(message(error));
     } finally {
-      await clearSession();
+      operationLock.current = false;
+      setBusy(false);
     }
   }
-
-  if (checkingAuth) {
-    return (
-      <SafeAreaView style={styles.loadingScreen}>
-        <StatusBar style="dark" />
-        <View style={styles.loadingLogo}>
-          <Text style={styles.loadingLogoText}>R</Text>
-        </View>
-        <ActivityIndicator color={COLORS.blue} />
-      </SafeAreaView>
-    );
+  async function addStock() {
+    if (
+      !restock ||
+      operationLock.current ||
+      !Number.isInteger(Number(stockQuantity)) ||
+      Number(stockQuantity) < 1
+    )
+      return;
+    operationLock.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await api<{ product: Product; data: Stock }>(
+        "/stocks",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            product_id: restock.id,
+            quantity: Number(stockQuantity),
+            note: stockNote,
+          }),
+        },
+        token,
+      );
+      setProducts((items) =>
+        items.map((item) =>
+          item.id === result.product.id ? result.product : item,
+        ),
+      );
+      setStocks((items) => [result.data, ...items].slice(0, 100));
+      setStockPage(1);
+      setNotice(`${stockQuantity} units added. Inventory updated.`);
+      setRestock(null);
+      Keyboard.dismiss();
+    } catch (error) {
+      if (isUnauthorized(error)) await clearSession();
+      else setError(message(error));
+    } finally {
+      operationLock.current = false;
+      setBusy(false);
+    }
   }
-
-  if (!user) {
-    return (
-      <Login
-        onLogin={async (nextUser, nextToken) => {
-          await setApiToken(nextToken);
-          setToken(nextToken);
-          setUser(nextUser);
-        }}
-      />
-    );
+  async function print(sale: Sale) {
+    if (printing) return;
+    setPrinting(true);
+    try {
+      await printReceipt(sale);
+    } catch (error) {
+      setError(message(error));
+    } finally {
+      setPrinting(false);
+    }
   }
-
-  return (
-    <SafeAreaView style={styles.screen} edges={["top"]}>
-      <StatusBar style="dark" />
-      <View style={styles.header}>
-        <View style={styles.headerInner}>
-          <View style={styles.brandRow}>
-            <View style={styles.logoSmall}>
-              <Text style={styles.logoSmallText}>R</Text>
-            </View>
-            <View>
-              <Text style={styles.brandName}>RJane Water</Text>
-              <Text style={styles.brandSection}>MOBILE POS</Text>
-            </View>
-          </View>
-          <View style={styles.accountRow}>
-            {!compact && (
-              <View style={styles.accountCopy}>
-                <Text numberOfLines={1} style={styles.accountName}>
-                  {user.name}
-                </Text>
-                <Text style={styles.accountRole}>{user.role}</Text>
-              </View>
-            )}
-            <Pressable
-              accessibilityRole="button"
-              hitSlop={8}
-              onPress={() => void logout()}
-              style={({ pressed }) => [
-                styles.logoutButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={styles.logoutText}>Sign out</Text>
-            </Pressable>
-          </View>
+  function pagination(
+    page: number,
+    count: number,
+    setPage: (page: number) => void,
+  ) {
+    return (
+      <View style={s.pagination}>
+        <Text style={s.muted}>
+          Page {page} / {Math.max(1, Math.ceil(count / 10))}
+        </Text>
+        <View style={s.row}>
+          <Button
+            title="Previous"
+            secondary
+            small
+            disabled={page === 1}
+            onPress={() => setPage(page - 1)}
+          />
+          <Button
+            title="Next"
+            secondary
+            small
+            disabled={page * 10 >= count}
+            onPress={() => setPage(page + 1)}
+          />
         </View>
       </View>
-
-      <ScrollView
-        contentContainerStyle={[styles.content, { width: contentWidth }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={() => void load()}
-            tintColor={COLORS.blue}
-            colors={[COLORS.blue]}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.heroCard}>
-          <View style={styles.heroGlow} />
-          <Text style={styles.heroEyebrow}>TODAY’S OVERVIEW</Text>
-          <Text style={styles.heroGreeting}>
-            {greeting()}, {user.name.split(" ")[0]}.
+    );
+  }
+  if (checking)
+    return (
+      <SafeAreaView style={s.loading}>
+        <ActivityIndicator color={C.blue} />
+      </SafeAreaView>
+    );
+  if (!user) return <Login onLogin={login} />;
+  const cashier = user.role === "cashier";
+  return (
+    <SafeAreaView style={s.screen} edges={["top", "bottom", "left", "right"]}>
+      <StatusBar style="dark" />
+      <View style={s.topbar}>
+        <View style={s.smallBrand}>
+          <Text style={s.smallBrandLetters}>RJ</Text>
+        </View>
+        <View style={s.flex}>
+          <Text style={s.brandName}>RJane Water Station</Text>
+          <Text style={s.headerCaption}>
+            {cashier ? "Cashier terminal" : "Inventory & sales"} · {user.name}
           </Text>
-          <View style={styles.heroMetrics}>
-            <View style={styles.heroMetric}>
-              <Text style={styles.heroMetricLabel}>Revenue</Text>
-              <Text style={styles.heroMetricValue}>{money(revenue)}</Text>
-            </View>
-            <View style={styles.heroDivider} />
-            <View style={styles.heroMetric}>
-              <Text style={styles.heroMetricLabel}>Transactions</Text>
-              <Text style={styles.heroMetricValue}>{sales.length}</Text>
-            </View>
-          </View>
         </View>
-
-        <View style={styles.metricsRow}>
-          <Metric
-            label="ON HAND"
-            value={String(stockCount)}
-            helper="total units"
-          />
-          <Metric
-            label="NEEDS ATTENTION"
-            value={String(attentionCount)}
-            helper={attentionCount === 1 ? "product" : "products"}
-          />
-        </View>
-
-        {notice ? (
-          <View style={styles.notice}>
-            <View style={styles.noticeDot} />
-            <Text style={styles.noticeText}>{notice}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.segmentedControl}>
-          <Pressable
-            onPress={() => setTab("inventory")}
-            style={[
-              styles.segment,
-              tab === "inventory" && styles.segmentActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                tab === "inventory" && styles.segmentTextActive,
-              ]}
-            >
-              Inventory
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setTab("transactions")}
-            style={[
-              styles.segment,
-              tab === "transactions" && styles.segmentActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                tab === "transactions" && styles.segmentTextActive,
-              ]}
-            >
-              Transactions
-            </Text>
-          </Pressable>
-        </View>
-
-        {tab === "inventory" ? (
-          <View>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionTitle}>Products</Text>
-                <Text style={styles.sectionSubtitle}>
-                  {products.length} in inventory
-                </Text>
-              </View>
-              {user.role === "admin" ? (
-                <Pressable
-                  onPress={() => setEditor(null)}
-                  style={({ pressed }) => [
-                    styles.addButton,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <Text style={styles.addButtonPlus}>+</Text>
-                  <Text style={styles.addButtonText}>New product</Text>
-                </Pressable>
-              ) : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Refresh stocks"
+          disabled={loading || busy}
+          onPress={() => void refresh()}
+          style={s.headerButton}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={C.blue} />
+          ) : (
+            <Text style={s.headerIcon}>↻</Text>
+          )}
+        </Pressable>
+        <ChatAssistant key={user.id} compact onUnauthorized={clearSession} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+          disabled={busy}
+          onPress={() => void logout()}
+          style={s.headerButton}
+        >
+          <Text style={s.headerIcon}>↪</Text>
+        </Pressable>
+      </View>
+      {cashier ? (
+        <KeyboardAvoidingView
+          style={s.flex}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={[s.cashierMain, wide && s.landscapeMain]}>
+            <View style={[s.cashierHeading, keyboardVisible && s.hidden]}>
+              <Text style={s.pageTitle}>Point of sale</Text>
+              <Text style={s.cashBadge}>● Cash only</Text>
             </View>
-
-            <View style={styles.searchWrap}>
-              <Text style={styles.searchIcon}>⌕</Text>
-              <TextInput
-                value={search}
-                onChangeText={setSearch}
-                placeholder="Search inventory"
-                placeholderTextColor="#8D9BAD"
-                returnKeyType="search"
-                style={styles.searchInput}
-              />
-              {search ? (
-                <Pressable
-                  accessibilityLabel="Clear search"
-                  hitSlop={8}
-                  onPress={() => setSearch("")}
-                >
-                  <Text style={styles.searchClear}>×</Text>
-                </Pressable>
-              ) : null}
-            </View>
-
-            {loading && products.length === 0 ? (
-              <View style={styles.listLoader}>
-                <ActivityIndicator color={COLORS.blue} />
-              </View>
-            ) : filteredProducts.length === 0 ? (
-              <EmptyState
-                title={search ? "No matching products" : "No products yet"}
-                message={
-                  search
-                    ? "Try another product name."
-                    : "Add your first product to begin tracking inventory."
-                }
-              />
-            ) : (
-              filteredProducts.map((product) => {
-                const status = stockStatus(product);
-                return (
-                  <View key={product.id} style={styles.productCard}>
-                    <View
-                      style={[
-                        styles.productAccent,
-                        { backgroundColor: status.color },
-                      ]}
-                    />
-                    <View style={styles.productHeader}>
-                      <View style={styles.flexOne}>
-                        <Text style={styles.productName}>{product.name}</Text>
-                        <Text style={styles.productPrice}>
-                          {money(product.price)}{" "}
-                          <Text style={styles.mutedText}>/ {product.unit}</Text>
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          { backgroundColor: status.background },
-                        ]}
-                      >
-                        <Text
-                          style={[styles.statusText, { color: status.color }]}
-                        >
-                          {status.label}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.productFooter}>
-                      <View>
-                        <Text style={styles.stockLabel}>AVAILABLE STOCK</Text>
-                        <Text style={styles.stockValue}>
-                          {product.stock}{" "}
-                          <Text style={styles.stockUnit}>{product.unit}</Text>
-                        </Text>
-                        <Text style={styles.reorderText}>
-                          Reorder at {product.min_stock}
-                        </Text>
-                      </View>
-                      {user.role === "admin" ? (
-                        <View style={styles.cardActions}>
-                          <Pressable
-                            onPress={() => setEditor(product)}
-                            style={({ pressed }) => [
-                              styles.editButton,
-                              pressed && styles.pressed,
-                            ]}
-                          >
-                            <Text style={styles.editButtonText}>Edit</Text>
-                          </Pressable>
-                          <Pressable
-                            accessibilityLabel={`Delete ${product.name}`}
-                            onPress={() => remove(product)}
-                            style={({ pressed }) => [
-                              styles.deleteButton,
-                              pressed && styles.pressed,
-                            ]}
-                          >
-                            <Text style={styles.deleteButtonText}>×</Text>
-                          </Pressable>
-                        </View>
-                      ) : (
-                        <Pressable
-                          disabled={
-                            product.stock === 0 ||
-                            product.status === "unavailable"
-                          }
-                          onPress={() => setSaleProduct(product)}
-                          style={({ pressed }) => [
-                            styles.sellButton,
-                            (product.stock === 0 ||
-                              product.status === "unavailable") &&
-                              styles.disabled,
-                            pressed && styles.pressed,
-                          ]}
-                        >
-                          <Text style={styles.sellButtonText}>Sell now</Text>
-                        </Pressable>
-                      )}
-                    </View>
-                  </View>
-                );
-              })
-            )}
-          </View>
-        ) : (
-          <View>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionTitle}>Today’s sales</Text>
-                <Text style={styles.sectionSubtitle}>
-                  {sales.length} recorded{" "}
-                  {sales.length === 1 ? "transaction" : "transactions"}
-                </Text>
-              </View>
-            </View>
-            {loading && sales.length === 0 ? (
-              <View style={styles.listLoader}>
-                <ActivityIndicator color={COLORS.blue} />
-              </View>
-            ) : sales.length === 0 ? (
-              <EmptyState
-                title="No sales yet"
-                message="Completed cashier sales will appear here."
-              />
-            ) : (
-              <View style={styles.transactionList}>
-                {sales.map((sale, index) => (
+            <View style={[s.steps, keyboardVisible && s.hidden]}>
+              {["Container", "Cash payment", "Receipt"].map((title, index) => (
+                <View key={title} style={s.step}>
                   <View
-                    key={sale.id}
                     style={[
-                      styles.transactionRow,
-                      index < sales.length - 1 && styles.transactionBorder,
+                      s.stepNumber,
+                      (step === "select" ? 0 : step === "payment" ? 1 : 2) >=
+                        index && s.activeStep,
                     ]}
                   >
-                    <View style={styles.transactionIcon}>
-                      <Text style={styles.transactionIconText}>✓</Text>
-                    </View>
-                    <View style={styles.flexOne}>
-                      <Text style={styles.transactionProduct}>
-                        {sale.product_name}
-                      </Text>
-                      <Text style={styles.transactionMeta}>
-                        {sale.quantity} {sale.quantity === 1 ? "unit" : "units"}{" "}
-                        · {sale.cashier_name}
-                      </Text>
-                      <Text style={styles.transactionTime}>
-                        {new Date(sale.created_at).toLocaleTimeString([], {
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                      </Text>
-                    </View>
-                    <Text style={styles.transactionTotal}>
-                      {money(sale.total)}
+                    <Text
+                      style={[
+                        s.stepDigit,
+                        (step === "select" ? 0 : step === "payment" ? 1 : 2) >=
+                          index && s.activeStepDigit,
+                      ]}
+                    >
+                      {index + 1}
                     </Text>
                   </View>
-                ))}
-              </View>
-            )}
+                  <Text style={s.stepTitle}>{title}</Text>
+                </View>
+              ))}
+            </View>
+            <View
+              style={s.checkoutContent}
+              onLayout={(event) =>
+                setContentHeight(event.nativeEvent.layout.height)
+              }
+            >
+              {loading && !products.length ? (
+                <View style={s.center}>
+                  <ActivityIndicator color={C.blue} />
+                  <Text style={s.subtitle}>Loading your station…</Text>
+                </View>
+              ) : step === "select" ? (
+                <View style={[s.checkout, wide && s.checkoutWide]}>
+                  <View style={[s.panel, s.selection]}>
+                    {!tiny && (
+                      <Text style={s.panelTitle}>Choose your container</Text>
+                    )}
+                    <View style={s.productGrid}>
+                      {products.map((item) => (
+                        <Pressable
+                          key={item.id}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${label(item)}, ${money(item.price)}, ${item.stock} available`}
+                          accessibilityState={{
+                            selected: selected === item.id,
+                            disabled: item.stock === 0,
+                          }}
+                          disabled={item.stock === 0}
+                          onPress={() => {
+                            setSelected(item.id);
+                            setQuantity(1);
+                            setError("");
+                          }}
+                          style={({ pressed }) => [
+                            s.productTile,
+                            selected === item.id && s.selectedTile,
+                            item.stock === 0 && s.disabled,
+                            pressed && s.pressed,
+                          ]}
+                        >
+                          <View
+                            style={[
+                              s.selectionDot,
+                              selected === item.id && s.selectedDot,
+                            ]}
+                          >
+                            <Text style={s.selectedCheck}>
+                              {selected === item.id ? "✓" : ""}
+                            </Text>
+                          </View>
+                          {!tiny && (
+                            <WaterContainer
+                              bottle={isBottle(item)}
+                              size={Math.min(
+                                wide ? 90 : 125,
+                                Math.max(
+                                  36,
+                                  (contentHeight - (wide ? 130 : 260)) * 0.4,
+                                ),
+                              )}
+                            />
+                          )}
+                          <Text style={s.productTitle}>{label(item)}</Text>
+                          {!compact && (
+                            <Text style={s.productUnit}>{item.unit}</Text>
+                          )}
+                          <Text style={s.productPrice}>
+                            {money(item.price)}
+                          </Text>
+                          <Text
+                            style={[
+                              s.stockBadge,
+                              item.stock <= item.min_stock && s.lowStock,
+                            ]}
+                          >
+                            {item.stock} available
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                  <View style={[s.panel, s.order, wide && s.orderWide]}>
+                    {product ? (
+                      <>
+                        <Text style={s.orderProduct}>
+                          {label(product)} · purified water
+                        </Text>
+                        <View style={s.orderDetails}>
+                          <View style={s.quantityBox}>
+                            <Text style={s.muted}>Quantity</Text>
+                            <View style={s.stepper}>
+                              <Button
+                                title="−"
+                                secondary
+                                small
+                                disabled={quantity <= 1 || busy}
+                                onPress={() =>
+                                  setQuantity((value) => value - 1)
+                                }
+                              />
+                              <View style={s.quantityInput}>
+                                <Text
+                                  accessibilityLabel={`Quantity: ${quantity}`}
+                                  style={s.quantityValue}
+                                >
+                                  {quantity}
+                                </Text>
+                              </View>
+                              <Button
+                                title="+"
+                                secondary
+                                small
+                                disabled={quantity >= product.stock || busy}
+                                onPress={() =>
+                                  setQuantity((value) => value + 1)
+                                }
+                              />
+                            </View>
+                          </View>
+                          <View style={s.totalBox}>
+                            <Text style={s.muted}>Total amount</Text>
+                            <Text style={s.orderAmount}>{money(total)}</Text>
+                          </View>
+                        </View>
+                      </>
+                    ) : (
+                      <View style={s.emptyOrder}>
+                        <Text style={s.subtitle}>
+                          Select a container to start an order.
+                        </Text>
+                        <Text style={s.orderAmount}>{money(0)}</Text>
+                      </View>
+                    )}
+                    <Button
+                      title="Continue to payment →"
+                      disabled={!validQuantity}
+                      onPress={() => {
+                        Keyboard.dismiss();
+                        setStep("payment");
+                        setCash("");
+                        setError("");
+                      }}
+                    />
+                  </View>
+                </View>
+              ) : step === "payment" ? (
+                <View
+                  style={[
+                    s.panel,
+                    s.payment,
+                    wide && s.paymentWide,
+                    tiny && s.tinyPayment,
+                  ]}
+                >
+                  {!tiny && (
+                    <>
+                      <Text style={s.panelTitle}>Collect payment</Text>
+                      <Text style={s.subtitle}>
+                        {quantity} × {product ? label(product) : "Container"} ·
+                        purified water
+                      </Text>
+                    </>
+                  )}
+                  <View style={[s.paymentAmount, compact && s.compactAmount]}>
+                    <Text style={s.amountLabel}>Amount due</Text>
+                    <Text style={[s.amountDue, compact && s.compactDue]}>
+                      {money(total)}
+                    </Text>
+                  </View>
+                  <View style={[s.field, tiny && s.tinyField]}>
+                    <Text style={s.fieldLabel}>Cash received</Text>
+                    <TextInput
+                      accessibilityLabel="Cash received"
+                      keyboardType="decimal-pad"
+                      value={cash}
+                      onChangeText={setCash}
+                      editable={!busy}
+                      style={[s.input, s.cashInput, tiny && s.tinyInput]}
+                      placeholder="0.00"
+                      placeholderTextColor={C.muted}
+                    />
+                  </View>
+                  {!compact && (
+                    <View style={s.cashShortcuts}>
+                      {[
+                        ...new Set(
+                          [total, 50, 100, 200, 500, 1000].filter(
+                            (amount) => amount >= total,
+                          ),
+                        ),
+                      ].map((amount) => (
+                        <View style={s.shortcut} key={amount}>
+                          <Button
+                            title={amount === total ? "Exact" : money(amount)}
+                            secondary
+                            small
+                            disabled={busy}
+                            onPress={() => {
+                              Keyboard.dismiss();
+                              setCash(String(amount));
+                            }}
+                          />
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  <View style={s.changeRow}>
+                    <Text style={s.subtitle}>Change to return</Text>
+                    <Text style={[s.changeAmount, tiny && s.tinyChange]}>
+                      {validCash ? money(change) : "—"}
+                    </Text>
+                  </View>
+                  {cash && !validCash && !tiny ? (
+                    <Text style={s.paymentHint}>
+                      Enter enough cash to cover the total (up to 2 decimal
+                      places).
+                    </Text>
+                  ) : null}
+                  <Button
+                    title="Complete cash sale"
+                    busy={busy}
+                    disabled={!validQuantity || !validCash}
+                    onPress={() => void pay()}
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={busy}
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setStep("select");
+                      setError("");
+                    }}
+                    style={[s.backButton, tiny && s.tinyBack]}
+                  >
+                    <Text style={s.link}>← Back to container selection</Text>
+                  </Pressable>
+                </View>
+              ) : receipt ? (
+                <View style={s.receiptScreen}>
+                  <Text style={s.saleComplete}>✓ Sale complete</Text>
+                  {!compact && (
+                    <Text style={s.subtitle}>
+                      Return the change and print the customer’s receipt.
+                    </Text>
+                  )}
+                  <ReceiptPreview sale={receipt} />
+                  <View style={s.receiptActions}>
+                    <View style={s.flex}>
+                      <Button
+                        title="Print receipt"
+                        busy={printing}
+                        onPress={() => void print(receipt)}
+                      />
+                    </View>
+                    <View style={s.flex}>
+                      <Button
+                        title="New sale"
+                        secondary
+                        disabled={printing}
+                        onPress={reset}
+                      />
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+            </View>
           </View>
-        )}
-      </ScrollView>
-
-      {editor !== undefined ? (
-        <ProductModal
-          product={editor ?? undefined}
-          onClose={() => setEditor(undefined)}
-          onSave={saveProduct}
-        />
+        </KeyboardAvoidingView>
+      ) : (
+        <ScrollView
+          style={s.flex}
+          contentContainerStyle={s.adminMain}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={() => void refresh()}
+              tintColor={C.blue}
+            />
+          }
+        >
+          <Text style={s.eyebrow}>STATION OVERVIEW</Text>
+          <Text style={s.pageTitle}>Inventory dashboard</Text>
+          <Text style={s.subtitle}>
+            Keep your containers stocked and your station moving.
+          </Text>
+          <View style={s.metrics}>
+            <View style={[s.panel, s.metric]}>
+              <Text style={s.muted}>Today’s revenue</Text>
+              <Text style={s.metricValue}>{money(summary.revenue)}</Text>
+              <Text style={s.metricCaption}>Cash payments received</Text>
+            </View>
+            <View style={[s.panel, s.metric]}>
+              <Text style={s.muted}>Transactions today</Text>
+              <Text style={s.metricValue}>{summary.count}</Text>
+              <Text style={s.metricCaption}>Completed sales</Text>
+            </View>
+          </View>
+          <Text style={s.sectionTitle}>Purified water inventory</Text>
+          <View style={[s.inventoryCards, width >= 700 && s.inventoryWide]}>
+            {products.map((item) => (
+              <View key={item.id} style={[s.panel, s.inventoryCard]}>
+                <WaterContainer bottle={isBottle(item)} size={90} />
+                <View style={s.inventoryDetail}>
+                  <Text
+                    style={[
+                      s.stockBadge,
+                      item.stock <= item.min_stock && s.lowStock,
+                    ]}
+                  >
+                    {item.stock === 0
+                      ? "Out of stock"
+                      : item.stock <= item.min_stock
+                        ? "Low stock"
+                        : "In stock"}
+                  </Text>
+                  <Text style={s.inventoryTitle}>{label(item)}</Text>
+                  <Text style={s.productUnit}>
+                    {item.unit} · purified water
+                  </Text>
+                  <View style={s.stockValueRow}>
+                    <Text style={s.stockValue}>{item.stock}</Text>
+                    <Text style={s.muted}>units available</Text>
+                  </View>
+                  <View style={s.inventoryFooter}>
+                    <Text style={s.priceLabel}>{money(item.price)} / unit</Text>
+                    <Button
+                      title="+ Add stock"
+                      small
+                      onPress={() => {
+                        setRestock(item);
+                        setStockQuantity("");
+                        setStockNote("");
+                        setError("");
+                      }}
+                    />
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+          <View style={s.panel}>
+            <View style={s.tableHeading}>
+              <Text style={s.panelTitle}>Recent transactions</Text>
+              <Text style={s.subtitle}>Cash sales · latest 100 records</Text>
+            </View>
+            <View style={s.tableLabels}>
+              <Text style={[s.tableLabel, s.flex]}>RECEIPT / CONTAINER</Text>
+              <Text style={s.tableLabel}>TOTAL</Text>
+            </View>
+            {sales.slice((salePage - 1) * 10, salePage * 10).map((sale) => (
+              <Pressable
+                key={sale.id}
+                accessibilityRole="button"
+                accessibilityLabel={`View receipt ${receiptNumber(sale)}`}
+                onPress={() => setReceipt(sale)}
+                style={({ pressed }) => [s.tableRow, pressed && s.pressed]}
+              >
+                <View style={s.flex}>
+                  <Text style={s.transactionTitle}>
+                    {receiptNumber(sale)} ·{" "}
+                    {sale.product_name.replace("Purified Water - ", "")}
+                  </Text>
+                  <Text style={s.transactionMeta}>
+                    {sale.quantity} units · {sale.cashier_name} ·{" "}
+                    {date(sale.created_at)}
+                  </Text>
+                </View>
+                <View>
+                  <Text style={s.transactionTotal}>{money(sale.total)}</Text>
+                  <Text style={s.receiptLink}>Receipt →</Text>
+                </View>
+              </Pressable>
+            ))}
+            {!sales.length && (
+              <Text style={s.tableEmpty}>No transactions yet.</Text>
+            )}
+            {pagination(salePage, sales.length, setSalePage)}
+          </View>
+          <View style={s.panel}>
+            <View style={s.tableHeading}>
+              <Text style={s.panelTitle}>Recent stock additions</Text>
+              <Text style={s.subtitle}>
+                Inventory cards update immediately.
+              </Text>
+            </View>
+            <View style={s.tableLabels}>
+              <Text style={[s.tableLabel, s.flex]}>CONTAINER / ADDED BY</Text>
+              <Text style={s.tableLabel}>ADDED / STOCK AFTER</Text>
+            </View>
+            {stocks.slice((stockPage - 1) * 10, stockPage * 10).map((stock) => (
+              <View key={stock.id} style={s.tableRow}>
+                <View style={s.flex}>
+                  <Text style={s.transactionTitle}>
+                    {stock.product_name.replace("Purified Water - ", "")}
+                  </Text>
+                  <Text style={s.transactionMeta}>
+                    {stock.added_by} · {date(stock.created_at)}
+                  </Text>
+                  {stock.note ? (
+                    <Text style={s.transactionMeta}>{stock.note}</Text>
+                  ) : null}
+                </View>
+                <View style={s.stockTotal}>
+                  <Text style={s.positive}>+{stock.quantity}</Text>
+                  <Text style={s.transactionMeta}>
+                    {stock.stock_after} after
+                  </Text>
+                </View>
+              </View>
+            ))}
+            {!stocks.length && (
+              <Text style={s.tableEmpty}>No stock additions yet.</Text>
+            )}
+            {pagination(stockPage, stocks.length, setStockPage)}
+          </View>
+        </ScrollView>
+      )}
+      {newStock && cashier ? (
+        <View style={s.stockNotice} accessibilityLiveRegion="polite">
+          <View style={s.flex}>
+            <Text style={s.noticeTitle}>New stocks have arrived</Text>
+            <Text style={s.noticeCopy}>
+              Press Refresh to update available quantities.
+            </Text>
+          </View>
+          <Button
+            title="Refresh"
+            small
+            busy={loading}
+            disabled={busy}
+            onPress={() => void refresh()}
+          />
+        </View>
       ) : null}
-      {saleProduct ? (
-        <SaleModal
-          product={saleProduct}
-          onClose={() => setSaleProduct(null)}
-          onSell={sell}
-        />
+      {offline && !error ? (
+        <View style={s.toast}>
+          <Text style={s.errorText}>
+            Stock updates are offline. Press Refresh to reconnect.
+          </Text>
+        </View>
       ) : null}
-      <ChatAssistant key={user.id} onUnauthorized={clearSession} />
+      {error || notice ? (
+        <View
+          style={[s.toast, notice && !error ? s.successToast : null]}
+          accessibilityLiveRegion="polite"
+        >
+          <Text style={[s.toastText, notice && !error ? s.successText : null]}>
+            {error || notice}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss notification"
+            onPress={() => {
+              setError("");
+              setNotice("");
+            }}
+            style={s.dismissButton}
+          >
+            <Text style={s.toastText}>×</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      <Modal
+        visible={!!restock}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!busy) setRestock(null);
+        }}
+      >
+        <KeyboardAvoidingView
+          style={s.modalBackdrop}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <View style={s.modalCard}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={s.modalContent}
+            >
+              <View style={s.modalHeader}>
+                <Text style={s.panelTitle}>Add stock</Text>
+                <Button
+                  title="×"
+                  secondary
+                  small
+                  disabled={busy}
+                  onPress={() => {
+                    setRestock(null);
+                    setError("");
+                  }}
+                />
+              </View>
+              <Text style={s.subtitle}>
+                {restock ? label(restock) : ""} · {restock?.stock ?? 0}{" "}
+                currently available
+              </Text>
+              <Field
+                title="Units to add"
+                value={stockQuantity}
+                onChange={setStockQuantity}
+                numeric
+                disabled={busy}
+              />
+              <Field
+                title="Note (optional)"
+                value={stockNote}
+                onChange={(value) => setStockNote(value.slice(0, 255))}
+                disabled={busy}
+              />
+              <Text style={s.restockPreview}>
+                New stock:{" "}
+                {(restock?.stock ?? 0) + (Number(stockQuantity) || 0)} units
+              </Text>
+              {error ? <Text style={s.errorText}>{error}</Text> : null}
+              <Button
+                title="Confirm stock addition"
+                busy={busy}
+                disabled={
+                  !Number.isInteger(Number(stockQuantity)) ||
+                  Number(stockQuantity) < 1 ||
+                  Number(stockQuantity) > 100000
+                }
+                onPress={() => void addStock()}
+              />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      <Modal
+        visible={!cashier && !!receipt}
+        animationType="slide"
+        onRequestClose={() => setReceipt(null)}
+      >
+        <SafeAreaView style={s.screen}>
+          <View style={s.modalHeader}>
+            <Text style={s.panelTitle}>Receipt</Text>
+            <Button
+              title="Close"
+              secondary
+              small
+              onPress={() => {
+                setReceipt(null);
+                setError("");
+              }}
+            />
+          </View>
+          {receipt ? (
+            <>
+              <ReceiptPreview sale={receipt} />
+              <View style={s.modalContent}>
+                <Button
+                  title="Print receipt"
+                  busy={printing}
+                  onPress={() => void print(receipt)}
+                />
+              </View>
+            </>
+          ) : null}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  flexOne: { flex: 1 },
-  pressed: { opacity: 0.78 },
-  disabled: { opacity: 0.42 },
-  screen: { flex: 1, backgroundColor: COLORS.canvas },
-  loadingScreen: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 18,
-    backgroundColor: COLORS.canvas,
-  },
-  loadingLogo: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
-    backgroundColor: COLORS.navy,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  loadingLogoText: { color: "#FFFFFF", fontSize: 25, fontWeight: "900" },
-  header: {
-    backgroundColor: COLORS.card,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.line,
-  },
-  headerInner: {
-    width: "100%",
-    maxWidth: 760,
-    alignSelf: "center",
-    minHeight: 68,
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  brandRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  logoSmall: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: COLORS.navy,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoSmallText: { color: "#FFFFFF", fontSize: 17, fontWeight: "900" },
-  brandName: {
-    color: COLORS.ink,
-    fontSize: 15,
-    lineHeight: 18,
-    fontWeight: "800",
-  },
-  brandSection: {
-    color: COLORS.muted,
-    fontSize: 9,
-    lineHeight: 13,
-    fontWeight: "800",
-    letterSpacing: 1.2,
-  },
-  accountRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  accountCopy: { maxWidth: 130, alignItems: "flex-end" },
-  accountName: { color: COLORS.ink, fontSize: 12, fontWeight: "700" },
-  accountRole: {
-    color: COLORS.muted,
-    fontSize: 10,
-    textTransform: "capitalize",
-  },
-  logoutButton: {
-    minHeight: 38,
-    paddingHorizontal: 13,
-    borderRadius: 12,
-    backgroundColor: COLORS.sky,
-    justifyContent: "center",
-  },
-  logoutText: { color: COLORS.blue, fontSize: 12, fontWeight: "800" },
-  content: {
-    alignSelf: "center",
-    paddingTop: 20,
-    paddingBottom: 54,
-  },
-  heroCard: {
-    overflow: "hidden",
-    position: "relative",
-    backgroundColor: COLORS.navy,
-    borderRadius: 24,
-    padding: 22,
-    marginBottom: 14,
-    elevation: 4,
-    boxShadow: "0 8px 16px rgba(7, 26, 53, 0.18)",
-  },
-  heroGlow: {
-    position: "absolute",
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: COLORS.cyan,
-    opacity: 0.12,
-    right: -55,
-    top: -85,
-  },
-  heroEyebrow: {
-    color: "#79D6F1",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 1.5,
-    marginBottom: 8,
-  },
-  heroGreeting: {
-    color: "#FFFFFF",
-    fontSize: 25,
-    lineHeight: 31,
-    fontWeight: "800",
-    marginBottom: 24,
-  },
-  heroMetrics: { flexDirection: "row", alignItems: "stretch" },
-  heroMetric: { flex: 1 },
-  heroDivider: {
-    width: 1,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    marginHorizontal: 18,
-  },
-  heroMetricLabel: {
-    color: "#A7BED8",
-    fontSize: 11,
-    fontWeight: "600",
-    marginBottom: 5,
-  },
-  heroMetricValue: {
-    color: "#FFFFFF",
-    fontSize: 22,
-    fontWeight: "900",
-    letterSpacing: -0.5,
-  },
-  metricsRow: { flexDirection: "row", gap: 12, marginBottom: 20 },
-  metricCard: {
-    flex: 1,
-    minHeight: 100,
-    borderRadius: 18,
-    backgroundColor: COLORS.card,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    padding: 16,
-  },
-  metricLabel: {
-    color: COLORS.muted,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1,
-  },
-  metricValue: {
-    color: COLORS.ink,
-    fontSize: 25,
-    lineHeight: 31,
-    fontWeight: "900",
-    marginTop: 6,
-  },
-  metricHelper: { color: COLORS.muted, fontSize: 11 },
-  notice: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: COLORS.successSoft,
-    marginBottom: 16,
-  },
-  noticeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.success,
-  },
-  noticeText: {
-    flex: 1,
-    color: COLORS.success,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  segmentedControl: {
-    flexDirection: "row",
-    padding: 4,
-    borderRadius: 15,
-    backgroundColor: "#E6EDF3",
-    marginBottom: 24,
-  },
-  segment: {
-    flex: 1,
-    minHeight: 42,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  segmentActive: {
-    backgroundColor: COLORS.card,
-    elevation: 2,
-    boxShadow: "0 2px 8px rgba(27, 49, 77, 0.08)",
-  },
-  segmentText: { color: COLORS.muted, fontSize: 13, fontWeight: "700" },
-  segmentTextActive: { color: COLORS.ink, fontWeight: "900" },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 14,
-  },
-  sectionTitle: {
-    color: COLORS.ink,
-    fontSize: 20,
-    fontWeight: "900",
-    letterSpacing: -0.3,
-  },
-  sectionSubtitle: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
-  addButton: {
-    minHeight: 40,
-    paddingHorizontal: 13,
-    borderRadius: 13,
-    backgroundColor: COLORS.blue,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  addButtonPlus: {
-    color: "#FFFFFF",
-    fontSize: 19,
-    lineHeight: 20,
-    fontWeight: "500",
-  },
-  addButtonText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800" },
-  searchWrap: {
-    height: 50,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    backgroundColor: COLORS.card,
-    paddingHorizontal: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 14,
-  },
-  searchIcon: {
-    color: COLORS.muted,
-    fontSize: 23,
-    marginRight: 9,
-    marginTop: -3,
-  },
-  searchInput: { flex: 1, height: "100%", color: COLORS.ink, fontSize: 14 },
-  searchClear: { color: COLORS.muted, fontSize: 22, paddingLeft: 10 },
-  listLoader: {
-    minHeight: 180,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  productCard: {
-    overflow: "hidden",
-    position: "relative",
-    backgroundColor: COLORS.card,
-    borderRadius: 19,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    padding: 17,
-    marginBottom: 12,
-  },
-  productAccent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 4 },
-  productHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    marginBottom: 18,
-  },
-  productName: {
-    color: COLORS.ink,
-    fontSize: 16,
-    lineHeight: 21,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  productPrice: { color: COLORS.blue, fontSize: 13, fontWeight: "800" },
-  mutedText: { color: COLORS.muted, fontWeight: "500" },
-  statusBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
-  statusText: { fontSize: 10, fontWeight: "900" },
-  productFooter: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.line,
-    paddingTop: 14,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  stockLabel: {
-    color: COLORS.muted,
-    fontSize: 8,
-    fontWeight: "900",
-    letterSpacing: 1,
-  },
-  stockValue: {
-    color: COLORS.ink,
-    fontSize: 22,
-    fontWeight: "900",
-    marginTop: 2,
-  },
-  stockUnit: { color: COLORS.muted, fontSize: 11, fontWeight: "600" },
-  reorderText: { color: COLORS.muted, fontSize: 10, marginTop: 1 },
-  cardActions: { flexDirection: "row", alignItems: "center", gap: 8 },
-  editButton: {
-    height: 40,
-    minWidth: 65,
-    borderRadius: 12,
-    backgroundColor: COLORS.sky,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  editButtonText: { color: COLORS.blue, fontSize: 12, fontWeight: "900" },
-  deleteButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: COLORS.dangerSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  deleteButtonText: { color: COLORS.danger, fontSize: 21, lineHeight: 23 },
-  sellButton: {
-    minHeight: 42,
-    paddingHorizontal: 18,
-    borderRadius: 13,
-    backgroundColor: COLORS.blue,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sellButtonText: { color: "#FFFFFF", fontSize: 12, fontWeight: "900" },
-  emptyCard: {
-    minHeight: 210,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    backgroundColor: COLORS.card,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 28,
-  },
-  emptyIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 18,
-    backgroundColor: COLORS.sky,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  emptyIconText: { color: COLORS.blue, fontSize: 20, fontWeight: "900" },
-  emptyTitle: {
-    color: COLORS.ink,
-    fontSize: 15,
-    fontWeight: "800",
-    marginBottom: 5,
-  },
-  emptyMessage: {
-    color: COLORS.muted,
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: "center",
-    maxWidth: 270,
-  },
-  transactionList: {
-    overflow: "hidden",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    backgroundColor: COLORS.card,
-  },
-  transactionRow: {
-    minHeight: 87,
-    paddingHorizontal: 15,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  transactionBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.line,
-  },
-  transactionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
-    backgroundColor: COLORS.successSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  transactionIconText: {
-    color: COLORS.success,
-    fontSize: 16,
-    fontWeight: "900",
-  },
-  transactionProduct: {
-    color: COLORS.ink,
-    fontSize: 13,
-    fontWeight: "800",
-    marginBottom: 3,
-  },
-  transactionMeta: { color: COLORS.muted, fontSize: 11 },
-  transactionTime: { color: "#98A5B4", fontSize: 10, marginTop: 3 },
-  transactionTotal: { color: COLORS.blue, fontSize: 15, fontWeight: "900" },
-  loginScreen: { flex: 1, backgroundColor: COLORS.navy },
-  loginScroll: {
-    flexGrow: 1,
-    justifyContent: "flex-start",
-    paddingTop: 46,
-    paddingBottom: 32,
-  },
-  loginContainer: { alignSelf: "center" },
-  loginOrbLarge: {
-    pointerEvents: "none",
-    position: "absolute",
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: COLORS.cyan,
-    opacity: 0.08,
-    top: -95,
-    right: -100,
-  },
-  loginOrbSmall: {
-    pointerEvents: "none",
-    position: "absolute",
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: COLORS.blue,
-    opacity: 0.16,
-    bottom: 10,
-    left: -75,
-  },
-  loginBrand: { alignItems: "center", marginBottom: 28 },
-  logoLarge: {
-    width: 64,
-    height: 64,
-    borderRadius: 22,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
-  },
-  logoLetter: { color: COLORS.blue, fontSize: 29, fontWeight: "900" },
-  loginBrandName: {
-    color: "#FFFFFF",
-    fontSize: 25,
-    fontWeight: "900",
-    letterSpacing: -0.4,
-  },
-  loginBrandCaption: {
-    color: "#8FCBE4",
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1.8,
-    marginTop: 5,
-  },
-  loginCard: {
-    boxSizing: "border-box",
-    width: "100%",
-    backgroundColor: COLORS.card,
-    borderRadius: 26,
-    padding: 24,
-    elevation: 8,
-    boxShadow: "0 12px 24px rgba(0, 0, 0, 0.20)",
-  },
-  loginEyebrow: {
-    color: COLORS.blue,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1.4,
-    marginBottom: 7,
-  },
-  loginTitle: {
-    color: COLORS.ink,
-    fontSize: 23,
-    fontWeight: "900",
-    letterSpacing: -0.4,
-  },
-  loginSubtitle: {
-    color: COLORS.muted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 6,
-    marginBottom: 23,
-  },
-  loginFields: { gap: 2 },
-  loginFooter: {
-    color: "#8AA3BD",
-    textAlign: "center",
-    fontSize: 10,
-    marginTop: 18,
-  },
-  field: { marginBottom: 15 },
-  fieldLabel: {
-    color: COLORS.ink,
-    fontSize: 11,
-    fontWeight: "800",
-    marginBottom: 7,
-  },
-  input: {
-    height: 51,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: COLORS.line,
-    backgroundColor: "#F8FAFC",
-    paddingHorizontal: 14,
-    color: COLORS.ink,
-    fontSize: 14,
-  },
-  inlineError: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    borderRadius: 12,
-    backgroundColor: COLORS.dangerSoft,
-    padding: 11,
-    marginBottom: 14,
-  },
-  inlineErrorIcon: {
-    width: 19,
-    height: 19,
-    borderRadius: 10,
-    backgroundColor: COLORS.danger,
-    color: "#FFFFFF",
-    textAlign: "center",
-    fontSize: 12,
-    lineHeight: 19,
-    fontWeight: "900",
-  },
-  inlineErrorText: {
-    flex: 1,
-    color: COLORS.danger,
-    fontSize: 11,
-    lineHeight: 16,
-    fontWeight: "600",
-  },
-  primaryButton: {
-    minHeight: 51,
-    borderRadius: 15,
-    backgroundColor: COLORS.blue,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 18,
-  },
-  primaryButtonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "900" },
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(3, 14, 30, 0.58)",
-  },
-  modalDismissArea: { flex: 1 },
-  sheet: {
-    width: "100%",
-    maxWidth: 620,
-    maxHeight: "92%",
-    alignSelf: "center",
-    backgroundColor: COLORS.card,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 21,
-    paddingTop: 10,
-    paddingBottom: 12,
-  },
-  sheetHandle: {
-    width: 42,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: "#D8E0E8",
-    alignSelf: "center",
-    marginBottom: 16,
-  },
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 20,
-  },
-  sheetEyebrow: {
-    color: COLORS.blue,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1.3,
-    marginBottom: 4,
-  },
-  sheetTitle: { color: COLORS.ink, fontSize: 22, fontWeight: "900" },
-  closeButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: "#F0F4F7",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  closeButtonText: { color: COLORS.muted, fontSize: 25, lineHeight: 27 },
-  fieldRow: { flexDirection: "row", gap: 11 },
-  fieldHalf: { flex: 1 },
-  formError: {
-    color: COLORS.danger,
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: -3,
-    marginBottom: 12,
-  },
-  sheetActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 5,
-    paddingBottom: 8,
-  },
-  secondaryButton: {
-    flex: 1,
-    minHeight: 51,
-    borderRadius: 15,
-    backgroundColor: "#EDF2F6",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryButtonText: { color: COLORS.ink, fontSize: 13, fontWeight: "800" },
-  sheetPrimaryAction: { flex: 1.4 },
-  saleProductSummary: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderRadius: 17,
-    backgroundColor: COLORS.sky,
-    padding: 14,
-    marginBottom: 24,
-  },
-  saleProductIcon: {
-    width: 43,
-    height: 43,
-    borderRadius: 14,
-    backgroundColor: COLORS.blue,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  saleProductIconText: { color: "#FFFFFF", fontSize: 17, fontWeight: "900" },
-  saleProductName: {
-    color: COLORS.ink,
-    fontSize: 14,
-    fontWeight: "900",
-    marginBottom: 3,
-  },
-  availableText: { color: COLORS.success, fontSize: 11, fontWeight: "900" },
-  quantityLabel: {
-    color: COLORS.muted,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1.2,
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  stepper: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 24,
-  },
-  stepButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 17,
-    backgroundColor: COLORS.navy,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepDisabled: { backgroundColor: "#D8E0E8" },
-  stepButtonText: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    lineHeight: 27,
-    fontWeight: "600",
-  },
-  quantityValueWrap: { flex: 1, alignItems: "center" },
-  quantityValue: {
-    color: COLORS.ink,
-    fontSize: 37,
-    lineHeight: 42,
-    fontWeight: "900",
-  },
-  quantityUnit: { color: COLORS.muted, fontSize: 10 },
-  saleTotalRow: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.line,
-    paddingTop: 18,
-    paddingBottom: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  saleTotalLabel: {
-    color: COLORS.muted,
-    fontSize: 9,
-    fontWeight: "900",
-    letterSpacing: 1.2,
-    marginBottom: 4,
-  },
-  saleTotalValue: { color: COLORS.blue, fontSize: 25, fontWeight: "900" },
-});
