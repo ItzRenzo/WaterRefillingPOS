@@ -1,5 +1,8 @@
 # Deploy the web POS to Vercel
 
+For the free backend option using Render and Neon PostgreSQL, follow
+[Free hosting setup](FREE-HOSTING.md). It includes the Vercel connection steps.
+
 The React web frontend runs on Vercel. Laravel runs on a PHP 8.3+ host with a
 persistent SQLite disk (or a supported managed SQL database). The SQLite file in
 this repository cannot store live sales on Vercel's ephemeral filesystem.

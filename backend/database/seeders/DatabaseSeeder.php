@@ -23,14 +23,14 @@ class DatabaseSeeder extends Seeder
         $admin = User::query()->updateOrCreate(['username' => 'admin'], [
             'name' => 'Admin',
             'email' => 'admin@rjanewater.local',
-            'password' => Hash::make('admin123'),
+            'password' => Hash::make(config('pos.initial_admin_password') ?: 'admin123'),
         ]);
         $admin->syncRoles('admin');
 
         $cashier = User::query()->updateOrCreate(['username' => 'walton'], [
             'name' => 'Walton',
             'email' => 'walton@rjanewater.local',
-            'password' => Hash::make('cashier123'),
+            'password' => Hash::make(config('pos.initial_cashier_password') ?: 'cashier123'),
         ]);
         $cashier->syncRoles('cashier');
 

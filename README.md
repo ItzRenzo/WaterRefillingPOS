@@ -47,6 +47,7 @@ Copy-Item .env.example .env.local
 ## Run locally
 
 For production web hosting, follow [Deploy to Vercel](docs/VERCEL.md).
+For a free demo backend, use [Render + Neon setup](docs/FREE-HOSTING.md).
 Vercel hosts the responsive web frontend; the Laravel API and persistent database
 must be hosted separately.
 
