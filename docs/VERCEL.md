@@ -53,9 +53,10 @@ Confirm `https://api.your-domain.com/api/health` returns JSON. Configure
    build, output directory, and SPA refresh routing.
 4. Set **VITE_API_BASE** to `https://api.your-domain.com/api` for Production and
    Preview. This URL is public; it must include `/api`.
-5. Deploy. Builds fail with a clear message if the hosted API URL is missing or
-   invalid. Changing this value requires a new deployment because Vite embeds it
-   at build time.
+5. Deploy. If the hosted API URL is missing, the frontend still builds with a
+   warning so you can preview the website. Login, sales, inventory, and Ask AI
+   require the hosted API. An explicitly configured invalid URL fails the build.
+   Changing this value requires a new deployment because Vite embeds it at build time.
 6. Set the backend's `CORS_ALLOWED_ORIGINS` to the exact frontend URL. For a
    custom domain or preview deployment, add its exact origin, comma-separated,
    without paths or trailing slashes. Run `php artisan config:cache` after changes.
