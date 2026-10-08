@@ -67,6 +67,10 @@ cross-site cookies. Local `npm run dev` still proxies `/api` to port 8000.
 
 ## 3. Verify the deployment
 
+If login reports that the backend connection is not configured, set
+`VITE_API_BASE` in Vercel and redeploy. `/api` on the Vercel frontend has no Laravel
+server. A 404 from that address cannot be fixed by changing POS passwords.
+
 Open the Vercel URL on desktop and a phone. Sign in, check product stocks, add
 stock as admin, refresh as cashier, complete a cash sale, and open its receipt.
 Confirm the updated inventory survives restarting/redeploying the API host.

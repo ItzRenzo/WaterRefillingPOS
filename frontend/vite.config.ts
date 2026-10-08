@@ -4,6 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
+  const apiMissing = command === "build" && process.env.VERCEL === "1" &&
+    (!env.VITE_API_BASE?.trim() || env.VITE_API_BASE.trim() === "/api");
   if (command === "build" && process.env.VERCEL === "1") {
     const apiBase = env.VITE_API_BASE?.trim();
     if (!apiBase || apiBase === "/api") {
@@ -26,6 +28,7 @@ export default defineConfig(({ command, mode }) => {
     }
   }
   return {
+    define: { __HOSTED_API_MISSING__: JSON.stringify(apiMissing) },
     plugins: [react(), tailwindcss()],
     server: {
       host: "0.0.0.0",
