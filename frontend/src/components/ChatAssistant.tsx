@@ -94,7 +94,9 @@ export default function ChatAssistant() {
       <header className="chat-header">
         <div className="chat-avatar"><ChatIcon /></div>
         <div className="chat-heading"><h2 id="chat-title">RJane Assistant</h2><p>Inventory, sales & POS help</p></div>
-        <button className="chat-icon-button" onClick={() => { setOpen(false); launcher.current?.focus(); }} aria-label="Close chat">×</button>
+        <button className="chat-icon-button" type="button" onClick={() => { setOpen(false); launcher.current?.focus(); }} aria-label="Close chat">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+        </button>
       </header>
       <div className="chat-toolbar"><span>Powered by Gemini</span><button onClick={clearChat} disabled={!messages.length && !draft}>New chat</button></div>
       <div className="chat-messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation">

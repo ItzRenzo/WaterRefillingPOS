@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import Svg, { Path } from "react-native-svg";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -167,7 +168,7 @@ export default function ChatAssistant({
                 onPress={() => setOpen(false)}
                 style={styles.close}
               >
-                <Text style={styles.closeText}>×</Text>
+                <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth={2.5} strokeLinecap="round" accessible={false}><Path d="m6 6 12 12M18 6 6 18" /></Svg>
               </Pressable>
             </View>
             <View style={styles.toolbar}>
@@ -380,12 +381,16 @@ const styles = StyleSheet.create({
   title: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
   subtitle: { color: "#DBEAFE", fontSize: 12, marginTop: 3 },
   close: {
-    minWidth: 44,
-    minHeight: 44,
+    width: 44,
+    height: 44,
+    flexShrink: 0,
+    padding: 0,
+    borderWidth: 0,
+    borderRadius: 10,
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
-  closeText: { color: "#FFFFFF", fontSize: 30 },
   toolbar: {
     flexDirection: "row",
     alignItems: "center",

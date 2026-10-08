@@ -8,7 +8,9 @@
 .chat-heading { flex: 1; }
 .chat-heading h2 { margin: 0; font-size: 15px; font-weight: 700; }
 .chat-heading p { margin: 4px 0 0; font-size: 11px; color: #dbeafe; }
-.chat-icon-button { width: 40px; height: 40px; background: transparent; border: 0; font-size: 26px; color: #fff; cursor: pointer; }
+.chat-icon-button { display: flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; height: 44px; padding: 0; background: transparent; border: 0; border-radius: 10px; line-height: 0; color: #fff; cursor: pointer; }
+.chat-icon-button svg { display: block; flex-shrink: 0; }
+.chat-assistant .chat-icon-button:hover:not(:disabled) { background: #ffffff18; border-color: transparent; }
 .chat-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 6px 18px; border-bottom: 1px solid #e5e7eb; color: #64748b; font-size: 11px; }
 .chat-toolbar button { padding: 8px; border: 0; color: #1e40af; font-weight: 600; background: transparent; cursor: pointer; }
 .chat-assistant button:disabled { opacity: .45; cursor: default; }
