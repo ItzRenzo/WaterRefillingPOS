@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, getApiToken, setApiToken } from "./api";
+import ChatAssistant from "./components/ChatAssistant";
 
 /* ── Types ───────────────────────────────────────────────────────────── */
 type Role = "admin" | "cashier";
@@ -839,6 +840,8 @@ function Dashboard({ user, onLogout }: { user: User; onLogout: () => void }) {
           </div>
         )}
       </main>
+
+      <ChatAssistant key={user.id} />
 
       {modal && <EditModal item={modal.item} isNew={modal.isNew} onSave={saveItem} onClose={() => setModal(null)} />}
       {deleteId !== null && deleteItem && (

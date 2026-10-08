@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
 import { api, isUnauthorized, restoreApiToken, setApiToken } from "@/api";
+import ChatAssistant from "@/components/chat-assistant";
 
 type Role = "admin" | "cashier";
 type User = { id: number; name: string; username: string; role: Role };
@@ -1166,6 +1167,7 @@ export default function HomeScreen() {
           onSell={sell}
         />
       ) : null}
+      <ChatAssistant key={user.id} onUnauthorized={clearSession} />
     </SafeAreaView>
   );
 }

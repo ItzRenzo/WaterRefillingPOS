@@ -86,12 +86,13 @@ export function isUnauthorized(error: unknown): boolean {
   return error instanceof ApiError && error.status === 401;
 }
 
-export async function api<T>(path: string, options: RequestInit = {}, token: string | null = apiToken): Promise<T> {
+export async function api<T>(path: string, options: RequestInit = {}, token: string | null = apiToken, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const externalSignal = options.signal;
   const abortFromCaller = () => controller.abort();
   externalSignal?.addEventListener('abort', abortFromCaller, { once: true });
+  if (externalSignal?.aborted) controller.abort();
 
   try {
     const response = await fetch(`${getApiBase()}${path.startsWith('/') ? path : `/${path}`}`, {

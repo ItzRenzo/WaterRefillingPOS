@@ -82,6 +82,41 @@ computer's LAN IP address and run Laravel on the network:
 php artisan serve --host=0.0.0.0
 ```
 
+## Gemini AI assistant (web and mobile)
+
+After signing in, use **Ask AI** on the website or **Ask RJane Assistant** at the bottom of the mobile app.
+The website chat also adapts to phone screens. Both clients use the same authenticated Laravel endpoint,
+`POST /api/chat`. The assistant can explain POS tasks and answer questions about current stock, prices,
+and today's sales; it cannot modify inventory or process sales.
+
+1. Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/api-keys).
+2. Add these values to `backend/.env`:
+
+   ```dotenv
+   GEMINI_API_KEY=your_actual_key_here
+   GEMINI_MODEL=gemini-3.5-flash-lite
+   GEMINI_REQUESTS_PER_MINUTE=10
+   ```
+
+3. In `backend`, run `php artisan config:clear`, then start/restart the API as usual.
+4. Start the web/mobile app using the existing API base configuration. No Gemini key belongs in
+   `VITE_*`, `EXPO_PUBLIC_*`, browser storage, or the mobile bundle.
+
+The default model has a [Gemini free tier](https://ai.google.dev/gemini-api/docs/pricing).
+Model access and quotas depend on your Google project; change `GEMINI_MODEL` to an available
+text model in your AI Studio account if needed. The app makes no automatic retries or paid-model fallbacks.
+It limits each user to five requests per minute and shares the configured project limit across all users;
+adjust that limit to your account's actual quota. Daily/token quota exhaustion displays an error with a retry option.
+
+Each question sends the message, up to six previous conversation turns, the signed-in role, a snapshot
+of up to 100 products (prioritizing products needing stock), and today's aggregate sales totals to Google.
+No passwords, tokens, user names, or individual sale records are included in the snapshot.
+Google's free-tier data use is described on its pricing page. Chats remain in memory and clear when you
+start a new chat, reload, or sign out; closing/reopening the panel preserves the current conversation.
+
+The feature tests mock Gemini so tests never use your key or consume provider quota. A real Gemini
+response requires your configured API key and internet access.
+
 ## Checks
 
 ```powershell
