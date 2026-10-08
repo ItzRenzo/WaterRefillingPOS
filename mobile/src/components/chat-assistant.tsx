@@ -305,7 +305,15 @@ export default function ChatAssistant({
                     pressed && styles.pressed,
                   ]}
                 >
-                  <Text style={styles.sendText}>↑</Text>
+                  <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                    <Path
+                      d="m5 12 7-7 7 7M12 5v15"
+                      stroke="#FFFFFF"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </Svg>
                 </Pressable>
               </View>
               <Text style={styles.privacy}>
@@ -503,12 +511,14 @@ const styles = StyleSheet.create({
   send: {
     width: 48,
     height: 48,
+    padding: 0,
+    borderWidth: 0,
+    flexShrink: 0,
     backgroundColor: "#1769E0",
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  sendText: { color: "#FFFFFF", fontSize: 26, fontWeight: "700" },
   privacy: {
     fontSize: 10,
     lineHeight: 15,
